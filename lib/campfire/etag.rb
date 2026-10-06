@@ -5,6 +5,8 @@ module Campfire
   # method), from the body's MD5, and a 304 when a GET's client already has it. Pages with large bodies set their own ETag
   # from what they're rendered from instead (as the Rust port does), which saves hashing the body.
   class ETag
+    BODY_DIGEST = "campfire.body_digest"
+
     def initialize(app)
       @app = app
     end
@@ -18,7 +20,11 @@ module Campfire
         body.each { content << it }
         body.close if body.respond_to?(:close)
         body = [ content ]
-        headers["etag"] = %(W/"#{Digest::MD5.hexdigest(content)}") unless content.empty?
+        unless content.empty?
+          digest = Digest::MD5.hexdigest(content)
+          headers["etag"] = %(W/"#{digest}")
+          env[BODY_DIGEST] = digest # Compression keeps the gzip of a body under its digest
+        end
       end
 
       if headers["etag"] && env["REQUEST_METHOD"] == "GET" && env["HTTP_IF_NONE_MATCH"] == headers["etag"]

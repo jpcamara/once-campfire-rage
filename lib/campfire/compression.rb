@@ -6,9 +6,11 @@ module Campfire
   # (bypass for writes; this app keeps no shared response cache, so reads are always a miss).
   class Compression
     NO_BODY = [ 101, 204, 304 ].freeze
+    KEPT_LIMIT = 1024
 
     def initialize(app)
       @app = app
+      @kept = {} # gzipped bodies by the MD5 the ETag middleware took of them, least recently used first
     end
 
     def call(env)
@@ -27,15 +29,32 @@ module Campfire
 
       if body.is_a?(FragmentBody)
         compressed = body.gzip
+      elsif (digest = env[ETag::BODY_DIGEST])
+        compressed = kept(digest) { gzip(body) }
       else
-        content = +""
-        body.each { content << it }
-        body.close if body.respond_to?(:close)
-        compressed = Zlib::Deflate.new(Zlib::DEFAULT_COMPRESSION, Zlib::MAX_WBITS + 16).deflate(content, Zlib::FINISH)
+        compressed = gzip(body)
       end
       headers["content-encoding"] = "gzip"
       headers["content-length"] = compressed.bytesize.to_s
       [ status, headers, [ compressed ] ]
     end
+
+    private
+      def gzip(body)
+        content = +""
+        body.each { content << it }
+        body.close if body.respond_to?(:close)
+        Zlib::Deflate.new(Zlib::DEFAULT_COMPRESSION, Zlib::MAX_WBITS + 16).deflate(content, Zlib::FINISH)
+      end
+
+      def kept(digest)
+        if (compressed = @kept.delete(digest))
+          @kept[digest] = compressed
+        else
+          compressed = @kept[digest] = yield.freeze
+          @kept.delete(@kept.first[0]) while @kept.size > KEPT_LIMIT
+          compressed
+        end
+      end
   end
 end
