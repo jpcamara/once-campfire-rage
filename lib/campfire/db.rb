@@ -48,44 +48,46 @@ module Campfire
         end
     end
 
-    # Prepared statements by shard, type and SQL, named in the order they're first used.
+    # Prepared statements by shard and SQL, registered with Sequel once and named in the order they're
+    # first used.
     class Statements
       def initialize(sequel)
         @sequel = sequel
-        @statements = {}
+        @names = {}
       end
 
-      def fetch(server, type, sql, arity)
-        @statements[[ server, type, sql, arity ]] ||= begin
+      def fetch(server, sql, arity)
+        @names[[ server, sql, arity ]] ||= :"q#{@names.size}".tap do |name|
           binds = Array.new(arity) { :"$a#{it}" }
-          @sequel.dataset.with_sql(sql, *binds).server(server).prepare(type, :"q#{@statements.size}")
+          @sequel.dataset.with_sql(sql, *binds).server(server).prepare(:select, name)
         end
       end
     end
 
     # Queries on one shard. Rows come back as arrays, in the order of the SELECT's columns.
+    #
+    # A statement runs through Sequel::Database#execute by its prepared statement's name: Sequel's
+    # pool, cached SQLite statement and error handling, without binding through a cloned dataset or
+    # building a hash per row (which was a fifth of a post's time).
     class Connection
-      ARGUMENT_NAMES = Array.new(256) { :"a#{it}" }.freeze # more for longer IN lists, made as needed
+      ARGUMENT_KEYS = Array.new(256) { "a#{it}".freeze }.freeze # more for longer IN lists, made as needed
 
       def initialize(sequel, statements, server)
         @sequel, @statements, @server = sequel, statements, server
       end
 
       def rows(sql, *binds)
-        call(:select, sql, binds).map!(&:values)
+        rows = nil
+        @sequel.execute(@statements.fetch(@server, sql, binds.size), server: @server, arguments: arguments(binds)) { rows = it.to_a }
+        rows
       end
 
-      def row(sql, *binds)
-        call(:select, sql, binds).first&.values
-      end
-
-      def value(sql, *binds)
-        call(:select, sql, binds).first&.first&.last
-      end
+      def row(sql, *binds) = rows(sql, *binds).first
+      def value(sql, *binds) = rows(sql, *binds).first&.first
 
       # The number of rows changed.
       def run(sql, *binds)
-        call(:update, sql, binds)
+        @sequel.execute_dui(@statements.fetch(@server, sql, binds.size), server: @server, arguments: arguments(binds))
       end
 
       def last_insert_row_id
@@ -95,13 +97,13 @@ module Campfire
       private
         # Strings from Iodine (headers, the client's address) arrive binary-encoded, and SQLite binds
         # those as blobs, which never equal text. Everything the app binds is text.
-        def call(type, sql, binds)
+        def arguments(binds)
           arguments = {}
           binds.each_with_index do |value, i|
             value = value.dup.force_encoding(Encoding::UTF_8) if value.is_a?(String) && value.encoding == Encoding::BINARY
-            arguments[ARGUMENT_NAMES[i] || :"a#{i}"] = value
+            arguments[ARGUMENT_KEYS[i] || "a#{i}"] = value
           end
-          @statements.fetch(@server, type, sql, binds.size).call(arguments)
+          arguments
         end
     end
 
