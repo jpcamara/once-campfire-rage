@@ -11,8 +11,9 @@ Rage.configure do
   # Jobs run in this process, in memory, as the Rust port's do.
   config.deferred.backend = nil
 
-  # The forms' method override, Thruster's response cache and gzip, Rails' Rack::ETag, digested
-  # assets from memory.
+  # The real clock's Date under the parity harness's faked one, the forms' method override,
+  # Thruster's response cache and gzip, Rails' Rack::ETag, digested assets from memory.
+  config.middleware.use Campfire::RealDate if Campfire::RealDate.wrap?
   config.middleware.use Campfire::RequestMethod
   config.middleware.use Campfire::ResponseCache
   config.middleware.use Campfire::Compression
