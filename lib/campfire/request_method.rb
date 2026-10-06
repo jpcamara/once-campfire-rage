@@ -3,8 +3,13 @@ module Campfire
   # turns a POST into PATCH, PUT or DELETE, and a HEAD request runs its GET route with the body
   # dropped. Rage routes on REQUEST_METHOD before it parses the body, so the override reads the
   # form itself; the body is only parsed when it mentions `_method`.
+  #
+  # It also routes the one format-suffixed path the app's own forms post to: `form_with model:
+  # Current.account` gives `/account.<id>` (a singular resource's path helper puts the record in the
+  # format slot), which Rails routes to accounts#update. Rage's router has no `(.:format)`.
   class RequestMethod
     OVERRIDABLE = %w[ GET HEAD PUT POST DELETE OPTIONS PATCH LINK UNLINK ].freeze
+    ACCOUNT_WITH_FORMAT = %r{\A/account\.[^/]+\z}
     TRACE = ENV["CAMPFIRE_TRACE"] # debugging: each request's start and end on stdout
 
     def initialize(app)
@@ -24,6 +29,7 @@ module Campfire
       end
 
       def dispatch(env)
+        env["PATH_INFO"] = "/account" if ACCOUNT_WITH_FORMAT.match?(env["PATH_INFO"])
         case env["REQUEST_METHOD"]
         when "POST" then override(env)
         when "HEAD"
@@ -51,7 +57,10 @@ module Campfire
         raw = input.read.to_s
         input.rewind
         return unless raw.include?("_method")
-        Rack::Request.new(env).POST["_method"].tap { input.rewind }
+        # Parse the bytes already read, not rack.input: Iodine's #read(length, buffer) copies into the
+        # buffer without clearing Ruby's cached coderange, so Rack's multipart parser takes a binary
+        # part (an avatar or logo upload) for ASCII and raises "invalid byte sequence in UTF-8".
+        Rack::Request.new(env.merge("rack.input" => StringIO.new(raw))).POST["_method"]
       rescue EOFError, Rack::Multipart::Error
         nil
       end
