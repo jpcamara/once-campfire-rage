@@ -1,4 +1,10 @@
 class MessagesController < ApplicationController
+  # Finished pages of messages by their ETag (which covers the messages' versions, the user, the
+  # host and the user agent), the Accept header and the encoding, with their Last-Modified.
+  KEPT = {}
+  KEPT_LIMIT = 512
+  Kept = Data.define(:body, :last_modified)
+
   action :index do
     room_id = id_param("room_id")
     require_authentication!
@@ -21,10 +27,23 @@ class MessagesController < ApplicationController
     end
 
     etag_for_messages(messages)
-    # fresh_when @messages: the newest updated_at is the Last-Modified.
-    headers "last-modified" => messages.map { TimeFormat.parse(it.updated_at) }.max.httpdate
     html_headers
-    messages_html(messages)
+    flash_now # read (and so consumed) on every render
+    gzip = env["HTTP_ACCEPT_ENCODING"].to_s.include?("gzip") && env["REQUEST_METHOD"] == "GET"
+    key = [ headers["etag"], env["HTTP_ACCEPT"], gzip ]
+    if (kept = KEPT.delete(key))
+      KEPT[key] = kept
+    else
+      # fresh_when @messages: the newest updated_at is the Last-Modified.
+      last_modified = messages.map { TimeFormat.parse(it.updated_at) }.max.httpdate
+      page = messages_html(messages)
+      page = FragmentBody.new(page) unless page.is_a?(FragmentBody)
+      kept = KEPT[key] = Kept.new((gzip ? page.gzip : page.to_s).freeze, last_modified)
+      KEPT.delete(KEPT.first[0]) while KEPT.size > KEPT_LIMIT
+    end
+    headers "last-modified" => kept.last_modified, "content-length" => kept.body.bytesize.to_s
+    headers "content-encoding" => "gzip" if gzip
+    kept.body
   end
 
   action :create do
