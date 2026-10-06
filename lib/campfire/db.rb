@@ -107,21 +107,64 @@ module Campfire
         end
     end
 
+    # Read results, kept until the database changes. PRAGMA data_version on the reader connection
+    # changes whenever any other connection commits: this process's writer, or another worker's. It's
+    # checked once per fiber (each request, job and cable message runs in its own), and the cache is
+    # also cleared after this process's own commits. Rows are frozen, as they're shared.
+    class ReadCache
+      LIMIT = 8192
+
+      def initialize(sequel)
+        @sequel = sequel
+        @entries = {}
+        @version = nil
+        @checked = nil
+      end
+
+      def fetch(sql, binds)
+        refresh unless @checked.equal?(Fiber.current)
+        key = [ sql, *binds ]
+        if (rows = @entries.delete(key))
+          @entries[key] = rows
+        else
+          rows = @entries[key] = yield.each(&:freeze).freeze
+          @entries.delete(@entries.first[0]) while @entries.size > LIMIT
+          rows
+        end
+      end
+
+      def clear
+        @entries.clear
+        @checked = nil
+      end
+
+      private
+        def refresh
+          @checked = Fiber.current
+          version = @sequel.synchronize(:read_only) { it.get_first_value("PRAGMA data_version") }
+          @entries.clear unless version == @version
+          @version = version
+        end
+    end
+
     def initialize
       @sequel = self.class.sequel
       statements = Statements.new(@sequel)
       @reader = Connection.new(@sequel, statements, :read_only)
       @writer = Connection.new(@sequel, statements, :default)
       @write_lock = Mutex.new
+      @cache = ReadCache.new(@sequel)
     end
 
-    def rows(...) = @reader.rows(...)
-    def row(...) = @reader.row(...)
-    def value(...) = @reader.value(...)
+    def rows(sql, *binds) = @cache.fetch(sql, binds) { @reader.rows(sql, *binds) }
+    def row(sql, *binds) = rows(sql, *binds).first
+    def value(sql, *binds) = rows(sql, *binds).first&.first
 
     def transaction
       @write_lock.synchronize do
         @sequel.transaction(server: :default, mode: :immediate) { yield @writer }
+      ensure
+        @cache.clear
       end
     end
   end
