@@ -93,9 +93,14 @@ module Campfire
       end
 
       private
+        # Strings from Iodine (headers, the client's address) arrive binary-encoded, and SQLite binds
+        # those as blobs, which never equal text. Everything the app binds is text.
         def call(type, sql, binds)
           arguments = {}
-          binds.each_with_index { |value, i| arguments[ARGUMENT_NAMES[i]] = value }
+          binds.each_with_index do |value, i|
+            value = value.dup.force_encoding(Encoding::UTF_8) if value.is_a?(String) && value.encoding == Encoding::BINARY
+            arguments[ARGUMENT_NAMES[i]] = value
+          end
           @statements.fetch(@server, type, sql, binds.size).call(arguments)
         end
     end
