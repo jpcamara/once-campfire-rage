@@ -40,9 +40,32 @@ module Campfire
     def self.instance = (@instance ||= new)
   end
 
+  # The page's own text between fragments (layout, nav, composer), compressed once per distinct
+  # segment: most of it repeats from request to request.
+  class SegmentCache
+    Entry = Data.define(:deflated, :crc, :bytesize)
+
+    def initialize(limit = 2048)
+      @limit, @entries = limit, {}
+    end
+
+    def fetch(segment)
+      if (entry = @entries.delete(segment))
+        @entries[segment] = entry
+      else
+        entry = @entries[segment.frozen? ? segment : segment.dup.freeze] =
+          Entry.new(FragmentBody.deflate_block(segment), Zlib.crc32(segment), segment.bytesize)
+        @entries.delete(@entries.first[0]) while @entries.size > @limit
+        entry
+      end
+    end
+
+    def self.instance = (@instance ||= new)
+  end
+
   # A response body made of literal segments and cached fragments, in order. Plain clients get the
-  # pieces as they are; gzip clients get each fragment's cached deflate block, with only the
-  # literal segments compressed per request.
+  # pieces as they are; gzip clients get the cached deflate blocks of each run of fragments and of
+  # each literal segment.
   class FragmentBody
     MARKER = /\u0001(\d+)\u0002/
 
@@ -121,9 +144,10 @@ module Campfire
           crc = Zlib.crc32_combine(crc, entry.crc, entry.bytesize)
           size += entry.bytesize
         else
-          out << self.class.deflate_block(part)
-          crc = Zlib.crc32_combine(crc, Zlib.crc32(part), part.bytesize)
-          size += part.bytesize
+          entry = SegmentCache.instance.fetch(part)
+          out << entry.deflated
+          crc = Zlib.crc32_combine(crc, entry.crc, entry.bytesize)
+          size += entry.bytesize
         end
       end
       out << "\x03\x00".b
