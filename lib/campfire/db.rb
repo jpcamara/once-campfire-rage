@@ -119,6 +119,13 @@ module Campfire
         @entries = {}
         @version = nil
         @checked = nil
+        @generation = 0
+      end
+
+      # Bumped whenever the cache is cleared: anything derived from reads can be kept under it.
+      def generation
+        refresh unless @checked.equal?(Fiber.current)
+        @generation
       end
 
       def fetch(sql, binds)
@@ -135,6 +142,7 @@ module Campfire
 
       def clear
         @entries.clear
+        @generation += 1
         @checked = nil
       end
 
@@ -142,7 +150,10 @@ module Campfire
         def refresh
           @checked = Fiber.current
           version = @sequel.synchronize(:read_only) { it.get_first_value("PRAGMA data_version") }
-          @entries.clear unless version == @version
+          unless version == @version
+            @entries.clear
+            @generation += 1
+          end
           @version = version
         end
     end
@@ -157,6 +168,7 @@ module Campfire
     end
 
     def rows(sql, *binds) = @cache.fetch(sql, binds) { @reader.rows(sql, *binds) }
+    def generation = @cache.generation
     def row(sql, *binds) = rows(sql, *binds).first
     def value(sql, *binds) = rows(sql, *binds).first&.first
 
