@@ -26,8 +26,9 @@ module Campfire
       def sequel
         return @sequel if @sequel_pid == Process.pid
         @sequel_pid = Process.pid
+        # SQLite's own LIKE (case-insensitive for ASCII), as Rails leaves it; Sequel turns it case-sensitive.
         @sequel = Sequel.sqlite(path, servers: { read_only: {} }, max_connections: 8, timeout: BUSY_TIMEOUT_MS,
-          after_connect: ->(connection, server) { configure(connection, server) })
+          case_sensitive_like: false, after_connect: ->(connection, server) { configure(connection, server) })
         @sequel.conversion_procs.clear
         @sequel
       end

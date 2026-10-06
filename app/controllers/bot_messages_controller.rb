@@ -1,7 +1,5 @@
 # The bot API: /rooms/:room_id/:bot_key/messages
 class BotMessagesController < ApplicationController
-  BOT_KEY = /\A\d+-[A-Za-z0-9]+\z/
-
   action :index do
     bot, room = bot_room_from_params!
     messages =
@@ -56,14 +54,10 @@ class BotMessagesController < ApplicationController
 
   private
     def message_id_param
-      id = params["id"].to_s.delete_suffix(".json")
-      record_not_found! unless id.match?(/\A\d+\z/)
-      id.to_i
+      params["id"].to_s.delete_suffix(".json").to_i
     end
 
     def bot_room_from_params!
-      room_id = id_param("room_id")
-      record_not_found! unless params["bot_key"].to_s.match?(BOT_KEY)
-      bot_room!(params["bot_key"], room_id)
+      bot_room!(params["bot_key"].to_s, id_param("room_id"))
     end
 end

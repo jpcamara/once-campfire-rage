@@ -1,6 +1,5 @@
 # The reference's routes (config/routes.rb in once-campfire). Rage matches static segments before
-# parameters, so the order here doesn't matter; actions check that ids are digits, as the
-# reference's routes only match digits there.
+# parameters, so the order here doesn't matter.
 Rage.routes.draw do
   get "/up", to: "health#show"
   %w[ /404.html /422.html /500.html /502.html /robots.txt ].each { get it, to: "public_files#show" }

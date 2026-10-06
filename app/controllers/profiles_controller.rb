@@ -17,7 +17,6 @@ class ProfilesController < ApplicationController
   end
 
   action :remove_avatar do
-    record_not_found! unless params["id"] == "me" || params["id"].to_s.match?(/\A\d+\z/)
     verify_same_origin!
     require_authentication!
     Profiles.remove_avatar(self, current_user)

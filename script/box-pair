@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# On the Hetzner box: the reference and this app side by side on fresh seed copies, for comparisons.
+#   script/box-pair start [IMAGE]   reference on 4594 (Thruster; Puma on 4595), this app on 4596
+#   script/box-pair stop
+# Both get the parity environment and the reference's Redis config on port 6392.
+set -euo pipefail
+BENCH_ROOT=${BENCH_ROOT:-/opt/campfire-perf/once-campfire-rust}
+SEED=$BENCH_ROOT/parity/.seed/default
+WORK=/opt/campfire-perf/.work-rage/pair
+CPUS=${SERVER_CPUS:-4-7}
+
+fresh() { # dir
+  rm -rf "$1"; mkdir -p "$1/db" "$1/storage"
+  cp -a "$SEED/db/." "$1/db/"; cp -a "$SEED/storage/." "$1/storage/"
+  python3 - "$1/db/production.sqlite3" <<'PY'
+import sqlite3, sys
+db = sqlite3.connect(sys.argv[1])
+db.execute("UPDATE push_subscriptions SET endpoint = 'https://127.0.0.1:9/push/' || id")
+db.execute("UPDATE webhooks SET url = 'http://127.0.0.1:9/hook/' || id")
+db.commit()
+PY
+  chown -R 1000:1000 "$1"
+}
+
+wait_up() { for _ in $(seq 1 600); do curl -fsS -o /dev/null "http://127.0.0.1:$1/up" 2>/dev/null && return 0; sleep 0.1; done; return 1; }
+
+case "${1:-}" in
+  start)
+    image=${2:-campfire-rage:app}
+    "$0" stop
+    mkdir -p "$WORK"; printf 'port 6392\nbind 127.0.0.1\ndaemonize no\nappendonly no\nsave ""\n' > "$WORK/redis.conf"
+    args=(); while IFS= read -r line; do args+=(-e "$line"); done < <(grep -Ev '^(#|$|WEB_CONCURRENCY|RAILS_LOG_LEVEL)' "$BENCH_ROOT/parity/.env.reference")
+    fresh "$WORK/ref"; fresh "$WORK/app"
+    docker run -d --name rage-ref --cpuset-cpus "$CPUS" --user 1000:1000 --network host "${args[@]}" -e WEB_CONCURRENCY=2 \
+      -e HTTP_PORT=4594 -e TARGET_PORT=4595 -e REDIS_URL=redis://127.0.0.1:6392/0 -v "$WORK/redis.conf:/rails/config/redis.conf:ro" \
+      -v "$WORK/ref/db:/rails/storage/db" -v "$WORK/ref/storage:/rails/storage/files" campfire-reference:app >/dev/null
+    wait_up 4594 || { docker logs rage-ref 2>&1 | tail -20; exit 1; }
+    docker run -d --name rage-app --cpuset-cpus "$CPUS" --user 1000:1000 --network host "${args[@]}" -e WEB_CONCURRENCY=2 \
+      -e HTTP_PORT=4596 -e REDIS_URL=redis://127.0.0.1:6392/1 ${EXTRA_ENV:-} \
+      -v "$WORK/app/db:/rails/storage/db" -v "$WORK/app/storage:/rails/storage/files" "$image" >/dev/null
+    wait_up 4596 || { docker logs rage-app 2>&1 | tail -20; exit 1; }
+    echo "reference :4594, $image :4596" ;;
+  stop) docker rm -f rage-ref rage-app >/dev/null 2>&1 || true ;;
+  *) sed -n '2,/^set -euo/p' "$0" | sed '$d; s/^# \{0,1\}//'; exit 1 ;;
+esac

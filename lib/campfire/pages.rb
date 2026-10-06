@@ -180,11 +180,10 @@ module Campfire
         nav: view.tpl_searches_nav, main: view.tpl_searches_index, footer: view.tpl_searches_footer, sidebar: view.tpl_searches_sidebar)
     end
 
-    # A numeric path segment, or the 404 an unmatched route gets (the reference's routes only match digits there).
+    # A record id from the path, cast as Active Record casts it: the reference's routes take any
+    # segment, and an id that isn't a number finds nothing.
     def id_param(name)
-      value = params[name].to_s
-      record_not_found! unless value.match?(/\A\d+\z/)
-      value.to_i
+      params[name].to_s.to_i
     end
   end
 end
