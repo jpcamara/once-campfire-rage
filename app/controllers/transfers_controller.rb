@@ -8,7 +8,7 @@ class TransfersController < ApplicationController
     verify_same_origin!
     user_id = secrets.find_signed_id(params["id"], "user/transfer")
     user = user_id && repo.user(user_id)
-    head_response(400) unless user&.active?
+    head_response(400, in_action: true) unless user&.active?
     start_new_session_for(user)
     redirect_after_authentication
   end

@@ -17,8 +17,10 @@ module Campfire
 
       headers["x-cache"] = %w[ GET HEAD ].include?(env["REQUEST_METHOD"]) ? "miss" : "bypass"
       # Writes pass through both the Rails app's Rack::Deflater and Thruster's gzip handler, which each
-      # add Accept-Encoding; reads are answered past Rack::Deflater's addition, so get one.
-      encodings = %w[ GET HEAD ].include?(env["REQUEST_METHOD"]) ? [ "Accept-Encoding" ] : [ "Accept-Encoding", "Accept-Encoding" ]
+      # add Accept-Encoding (Rack::Deflater not to bodiless statuses); reads are answered past
+      # Rack::Deflater's addition, so get one.
+      write = !%w[ GET HEAD ].include?(env["REQUEST_METHOD"])
+      encodings = write && !NO_BODY.include?(status) ? [ "Accept-Encoding", "Accept-Encoding" ] : [ "Accept-Encoding" ]
       headers["vary"] = [ headers["vary"], *encodings ].compact.join(",")
       return [ status, headers, body ] if NO_BODY.include?(status) || env["REQUEST_METHOD"] == "HEAD" || headers.key?("content-range")
       return [ status, headers, body ] if headers["content-encoding"] || !env["HTTP_ACCEPT_ENCODING"].to_s.include?("gzip")

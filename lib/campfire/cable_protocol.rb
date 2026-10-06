@@ -12,6 +12,7 @@ module Campfire
   class CableProtocol < Rage::Cable::Protocols::Base
     IDENTIFIER = :__identifier # the raw identifier, kept in each subscription's params
     BROADCASTS = "campfire:broadcasts"
+    DISCONNECTS = "campfire:disconnects"
     PING_INTERVAL_MS = 3_000
     HANDSHAKE_HEADERS = { "Sec-WebSocket-Protocol" => "actioncable-v1-json" } # not frozen: Iodine writes to it
     WELCOME = %({"type":"welcome"})
@@ -23,8 +24,10 @@ module Campfire
       def init(router)
         super
         @streams = Hash.new { |streams, name| streams[name] = {} } # this worker's subscriptions: stream => { id => params }
+        @connections = Hash.new { |connections, user_id| connections[user_id] = [] } # this worker's connections by user
         Iodine.on_state(:on_start) do
           Iodine.subscribe(BROADCASTS) { |_channel, message| deliver(message) }
+          Iodine.subscribe(DISCONNECTS) { |_channel, message| disconnect(*message.split(",")) }
           Iodine.run_every(PING_INTERVAL_MS) do
             Iodine.publish("cable:ping", %({"type":"ping","message":#{Time.now.to_i}}), Iodine::PubSub::PROCESS)
           end
@@ -33,6 +36,7 @@ module Campfire
 
       def on_open(connection)
         if @router.process_connection(connection)
+          @connections[user_id(connection)] << connection
           connection.subscribe("cable:ping")
           connection.write(WELCOME)
         else
@@ -54,7 +58,15 @@ module Campfire
       end
 
       def on_close(connection)
+        if (id = user_id(connection))
+          @connections[id].delete(connection)
+          @connections.delete(id) if @connections[id].empty?
+        end
         @router.process_disconnection(connection)
+      end
+
+      def disconnect_user(user_id, reconnect:)
+        Iodine.publish(DISCONNECTS, "#{user_id},#{reconnect}")
       end
 
       def subscribe(connection, name, params)
@@ -72,6 +84,16 @@ module Campfire
       end
 
       private
+        def user_id(connection) = connection.env["rage.identified_by"]&.[](:current_user)&.id
+
+        # ActionCable::Connection::Base#close(reason: "remote", reconnect:)
+        def disconnect(user_id, reconnect)
+          @connections.fetch(user_id.to_i, nil)&.dup&.each do |connection|
+            connection.write(%({"type":"disconnect","reason":"remote","reconnect":#{reconnect}}))
+            connection.close
+          end
+        end
+
         def deliver(message)
           name, payload = message.split("\0", 2)
           @streams.fetch(name, nil)&.each do |id, params|

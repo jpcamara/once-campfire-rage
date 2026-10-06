@@ -159,6 +159,7 @@ module Campfire
       if @__headers["cache-control"] == "max-age=0, private, must-revalidate" && @status != 200
         @__headers["cache-control"] = "no-cache"
       end
+      @__headers["cache-control"] ||= "no-cache" if @status == 204 # head :no_content
       @__headers["content-type"] ||= "text/html;charset=utf-8"
       body = @body || []
       if NO_BODY_STATUSES.include?(@status)
@@ -272,10 +273,12 @@ module Campfire
       headers "etag" => %(W/"#{Digest::MD5.hexdigest([ base_url, request.user_agent, current_user&.id, current_user&.updated_at, current_user&.role, *parts ].join("|"))}")
     end
 
-    def render_layout(view, main:, page_title: nil, body_class: nil, head: nil, nav: nil, footer: nil, sidebar: nil)
+    # frame_layout: false for MessagesController, whose `layout false, only: :index` replaces
+    # turbo-rails' frame layout, so its other actions render the application layout for frames too.
+    def render_layout(view, main:, page_title: nil, body_class: nil, head: nil, nav: nil, footer: nil, sidebar: nil, frame_layout: true)
       html_headers
       # Turbo::Frames::FrameRequest: frame requests get turbo-rails' bare frame layout.
-      if env["HTTP_TURBO_FRAME"].to_s != ""
+      if frame_layout && env["HTTP_TURBO_FRAME"].to_s != ""
         return "<html>\n  <head>\n    \n    #{head}\n  </head>\n  <body>\n    #{main}\n  </body>\n</html>\n"
       end
 
@@ -312,10 +315,11 @@ module Campfire
       Blob.new(*row)
     end
 
-    # ActionController::Head#head: no body, no-cache, the request's format as the content type.
-    def head_response(code)
-      type = env["HTTP_ACCEPT"].to_s.start_with?("text/vnd.turbo-stream.html") ? "text/vnd.turbo-stream.html" : "text/html"
-      halt code, { "content-type" => type, "cache-control" => "no-cache" }, ""
+    # ActionController::Head#head: no body, no-cache. Rails sets the controller's formats only after
+    # the before-actions, so a head from one is text/html; inside an action it's the request's format.
+    def head_response(code, in_action: false)
+      turbo = in_action && env["HTTP_ACCEPT"].to_s.start_with?("text/vnd.turbo-stream.html")
+      halt code, { "content-type" => turbo ? "text/vnd.turbo-stream.html" : "text/html", "cache-control" => "no-cache" }, ""
     end
 
     # ActiveRecord::RecordNotFound from a find: the public 404 page, as ActionDispatch::ShowExceptions

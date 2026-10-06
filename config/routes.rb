@@ -61,6 +61,9 @@ Rage.routes.draw do
   put "/rooms/:room_id/:bot_key/messages/:id", to: "bot_messages#update"
   patch "/rooms/:room_id/:bot_key/messages/:id", to: "bot_messages#update"
   delete "/rooms/:room_id/:bot_key/messages/:id", to: "bot_messages#destroy"
+  post "/rooms/:room_id/:bot_key/messages/:message_id/boosts", to: "bot_messages#create_boost"
+  post "/rooms/:room_id/:bot_key/messages/:message_id/boosts.json", to: "bot_messages#create_boost"
+  delete "/rooms/:room_id/:bot_key/messages/:message_id/boosts/:id", to: "bot_messages#destroy_boost"
 
   # Account
   get "/account/edit", to: "accounts#edit"

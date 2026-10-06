@@ -49,7 +49,7 @@ class MessagesController < ApplicationController
     room = room_scoped!(room_id)
     message = repo.room_message(room.id, id) or record_not_found!
     view = build_view
-    render_layout(view, main: view.render_message_cached(message_views([ message ]).first))
+    render_layout(view, main: view.render_message_cached(message_views([ message ]).first), frame_layout: false)
   end
 
   action :edit do
@@ -61,7 +61,7 @@ class MessagesController < ApplicationController
     message_view = Messages.views(self, [ message ], cached: false).first
     body = repo.bodies([ message.id ])[message.id]
     view = build_view(view: message_view, message: message, room: room, editor_value: Messages.editor_value(self, body))
-    render_layout(view, main: view.tpl_messages_edit)
+    render_layout(view, main: view.tpl_messages_edit, frame_layout: false)
   end
 
   action :update do

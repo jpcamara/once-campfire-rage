@@ -120,9 +120,11 @@ module Campfire
       %(<turbo-frame data-turbo-permanent="true" data-controller="rooms-list read-rooms turbo-frame" data-rooms-list-unread-class="unread" data-action="presence:present@window->rooms-list#read read-rooms:read->rooms-list#read turbo:frame-load->rooms-list#loaded refresh-room:visible@window->turbo-frame#reload" id="user_sidebar" src="/users/me/sidebar" target="_top"></turbo-frame>)
     end
 
+    # MessagesController#create's `render action: :room_not_found`: the HTML template in the
+    # application layout, whose composer frame the submitting frame takes.
     def render_room_not_found
-      html_headers("text/vnd.turbo-stream.html")
-      %(<turbo-stream action="update" target="message-area"><template><div class="message-area--empty min-width center txt-medium">This room has been deleted.</div></template></turbo-stream>)
+      view = build_view
+      render_layout(view, main: view.tpl_messages_room_not_found, frame_layout: false)
     end
 
     def messages_html(messages)
@@ -148,17 +150,30 @@ module Campfire
     def render_sidebar
       memberships = repo.sidebar_memberships(current_user.id)
       directs, others = memberships.partition { |_, room| room.direct? }
-      directs = directs.sort_by { |_, room| room.updated_at }.reverse.map do |membership, room|
-        members = repo.room_users_except(room.id, current_user.id)
-        members = [ current_user ] if members.empty?
-        [ membership, room, members ]
-      end
+      directs = directs.sort_by { |_, room| room.updated_at }.reverse
 
       exclude = repo.member_ids_of_rooms(repo.direct_room_ids(current_user.id)).uniq + [ current_user.id ]
       placeholders = repo.active_users_excluding(exclude, [ 20 - exclude.size, 0 ].max)
 
-      view = build_view(direct_memberships: directs, other_memberships: others, placeholder_users: placeholders)
+      view = build_view(other_memberships: others, placeholder_users: placeholders)
+      view = view.with(direct_memberships: cached_sidebar_directs(view, directs))
       render_layout(view, main: view.tpl_users_sidebar)
+    end
+
+    # `render partial: "users/sidebars/rooms/direct", collection: ..., cached: true`: the Redis cache
+    # store, keyed by the membership's id and updated_at. PresenceChannel marks a room read with
+    # update_all, which leaves updated_at alone, so a room read since its fragment was cached still
+    # shows unread here until a broadcast updates it.
+    def cached_sidebar_directs(view, directs)
+      return [] if directs.empty?
+      keys = directs.map { |membership, _| "views/users/sidebars/rooms/_direct/memberships/#{membership.id}-#{membership.updated_at}" }
+      cached = Redis.call("MGET", *keys)
+      directs.each_with_index.map do |(membership, room), index|
+        next cached[index].force_encoding(Encoding::UTF_8) if cached[index]
+        members = repo.room_users_except(room.id, current_user.id)
+        members = [ current_user ] if members.empty?
+        view.render_sidebar_direct(membership, room, members).tap { Redis.call("SET", keys[index], it) }
+      end
     end
 
     # ---- Searches

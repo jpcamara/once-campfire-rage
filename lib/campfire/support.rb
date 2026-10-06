@@ -34,7 +34,7 @@ module Campfire
       runtime = app.runtime
       user_id = runtime.secrets.find_signed_id(token, "user/avatar")
       user = user_id && runtime.repo.user(user_id)
-      app.head_response(404) unless user
+      app.head_response(404, in_action: true) unless user
 
       app.etag Digest::MD5.hexdigest("users/#{user.id}-#{user.updated_at}"), kind: :weak
       app.headers "Cache-Control" => "max-age=1800, public, stale-while-revalidate=604800"
@@ -374,22 +374,28 @@ module Campfire
 
     def exceeded?(key, limit:, within:)
       redis_key = "rate-limit:#{key}"
-      count = LOCK.synchronize do
-        redis.call("INCR", redis_key).tap { redis.call("EXPIRE", redis_key, within, "NX") if it == 1 }
-      end
+      count = Redis.call("INCR", redis_key)
+      Redis.call("EXPIRE", redis_key, within, "NX") if count == 1
       count > limit
     rescue RedisClient::Error
       false
     end
+  end
 
-    # One connection per process; RedisClient calls from different fibers mustn't interleave.
+  # The Rails app's Redis (its cache store): one connection per process. RedisClient calls from
+  # different fibers mustn't interleave, so each takes a lock.
+  module Redis
     LOCK = Mutex.new
 
+    def self.call(*command)
+      LOCK.synchronize { client.call(*command) }
+    end
+
     # bin/start runs Redis there unless REDIS_URL says otherwise.
-    def redis
-      @redis = nil unless @redis_pid == Process.pid
-      @redis_pid = Process.pid
-      @redis ||= RedisClient.config(url: ENV.fetch("REDIS_URL", "redis://127.0.0.1:6379/0")).new_client
+    def self.client
+      @client = nil unless @client_pid == Process.pid
+      @client_pid = Process.pid
+      @client ||= RedisClient.config(url: ENV.fetch("REDIS_URL", "redis://127.0.0.1:6379/0")).new_client
     end
   end
 
@@ -482,6 +488,7 @@ module Campfire
         w.run("DELETE FROM sessions WHERE user_id = ?", user.id)
         w.run("UPDATE users SET status = 2, updated_at = ? WHERE id = ?", now, user.id)
       end
+      Broadcasts.disconnect_user(user.id)
       Jobs.later(Bans, :remove_banned_content, user.id)
     end
 
@@ -615,17 +622,23 @@ module Campfire
 
     def update(ctx, room, type, name, user_ids)
       now = TimeFormat.now_text
+      revoked = []
       ctx.db.transaction do |w|
-        w.run("UPDATE rooms SET name = COALESCE(?, name), type = ?, updated_at = ? WHERE id = ?", name, type, now, room.id)
+        # update! touches updated_at only when the name or type changes
+        w.run("UPDATE rooms SET name = COALESCE(?, name), type = ?, updated_at = ? WHERE id = ? AND (name IS NOT COALESCE(?, name) OR type != ?)",
+          name, type, now, room.id, name, type)
         if type == "Rooms::Closed"
           grantees = user_ids.map(&:to_i)
           current = w.rows("SELECT user_id FROM memberships WHERE room_id = ?", room.id).map(&:first)
           (grantees - current).each { w.run("INSERT OR IGNORE INTO memberships (created_at, involvement, room_id, updated_at, user_id) VALUES (?, 'mentions', ?, ?, ?)", now, room.id, now, it) }
-          (current - grantees).each { w.run("DELETE FROM memberships WHERE room_id = ? AND user_id = ?", room.id, it) }
+          revoked = current - grantees
+          revoked.each { w.run("DELETE FROM memberships WHERE room_id = ? AND user_id = ?", room.id, it) }
         elsif room.type != "Rooms::Open"
           w.rows("SELECT id FROM users WHERE status = 0").each { |(uid)| w.run("INSERT OR IGNORE INTO memberships (created_at, room_id, updated_at, user_id) VALUES (?, ?, ?, ?)", now, room.id, now, uid) }
         end
       end
+      # Membership's after_destroy_commit: user.reset_remote_connections
+      revoked.each { Broadcasts.disconnect_user(it, reconnect: true) }
       room = ctx.repo.room(room.id)
       html = shared_html(room)
       replace = %(<turbo-stream action="replace" target="list_#{room.param_key}_#{room.id}"><template>#{html}</template></turbo-stream>)
@@ -717,6 +730,7 @@ module Campfire
         email = user.email_address&.sub("@", "-deactivated-#{SecureRandom.uuid}@")
         w.run("UPDATE users SET status = 1, email_address = ?, updated_at = ? WHERE id = ?", email, TimeFormat.now_text, user.id)
       end
+      Broadcasts.disconnect_user(user.id)
     end
   end
 end
@@ -900,10 +914,27 @@ module Campfire
         id: message.id,
         created_at: TimeFormat.parse(message.created_at).strftime("%Y-%m-%dT%H:%M:%S.%LZ"),
         body: { plain_text: Messages.plain_text_body(ctx, body, attachment), html: html },
-        creator: { id: creator.id, name: creator.name, role: creator.role_name, avatar_url: ctx.url_for(ctx.build_view.avatar_path(creator)) },
+        creator: user_json(ctx, creator),
         room: { id: message.room_id },
         url: ctx.url_for("/rooms/#{message.room_id}/messages/#{message.id}")
       }
+    end
+
+    # messages/boosts/_boost.json
+    def boost_json(ctx, boost, message)
+      booster = ctx.repo.user(boost.booster_id)
+      {
+        id: boost.id,
+        content: boost.content,
+        created_at: TimeFormat.parse(boost.created_at).strftime("%Y-%m-%dT%H:%M:%S.%LZ"),
+        booster: user_json(ctx, booster),
+        message: { id: message.id, url: ctx.url_for("/rooms/#{message.room_id}/messages/#{message.id}") }
+      }
+    end
+
+    # users/_user.json
+    def user_json(ctx, user)
+      { id: user.id, name: user.name, role: user.role_name, avatar_url: ctx.url_for(ctx.build_view.avatar_path(user)) }
     end
 
     def next_page_link(ctx, room, bot_key, messages)

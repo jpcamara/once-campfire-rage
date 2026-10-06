@@ -36,7 +36,9 @@ class BotMessagesController < ApplicationController
     @current_user = bot
     message = repo.room_message(room.id, id) or record_not_found!
     head_response(403) unless bot.can_administer?(message)
-    message = Messages.update(self, room, message, (params["message"] || {})["body"])
+    # Messages::ByBotsController#message_params: the raw request body is the message
+    request.body.rewind
+    message = Messages.update(self, room, message, request.body.read.to_s.force_encoding("UTF-8"))
     headers "content-type" => "application/json; charset=utf-8"
     RailsJSON.generate(BotApi.message_json(self, message))
   end
@@ -48,6 +50,29 @@ class BotMessagesController < ApplicationController
     head_response(403) unless bot.can_administer?(message)
     MessageRemoval.destroy(runtime, message)
     Broadcasts.turbo_stream("#{RailsCompat.gid_param(room.type, room.id)}:messages", %(<turbo-stream action="remove" target="message_#{message.client_message_id}"></turbo-stream>))
+    status 204
+    ""
+  end
+
+  # Messages::Boosts::ByBotsController: the raw request body is the boost's content
+  action :create_boost do
+    bot, room = bot_room_from_params!
+    @current_user = bot
+    message = repo.room_message(room.id, id_param("message_id")) or head_response(404)
+    request.body.rewind
+    content = request.body.read.to_s.force_encoding("UTF-8")
+    head_response(422) if content.strip.empty?
+    boost = Boosts.create(self, message, content)
+    status 201
+    headers "content-type" => "application/json; charset=utf-8"
+    RailsJSON.generate(BotApi.boost_json(self, boost, message))
+  end
+
+  action :destroy_boost do
+    bot, room = bot_room_from_params!
+    @current_user = bot
+    message = repo.room_message(room.id, id_param("message_id")) or head_response(404)
+    Boosts.destroy(self, message, message_id_param) or head_response(404)
     status 204
     ""
   end

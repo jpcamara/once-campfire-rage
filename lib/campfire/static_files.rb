@@ -19,6 +19,8 @@ module Campfire
       return [ 404, { "content-type" => "text/plain" }, [ "Not found" ] ] unless entry
 
       headers = { "cache-control" => @cache_control, "content-type" => entry.type, "last-modified" => entry.last_modified }
+      return partial(env, headers, entry.body) if env["HTTP_RANGE"]
+
       if entry.gzip && env["HTTP_ACCEPT_ENCODING"].to_s.include?("gzip")
         headers["content-encoding"] = "gzip"
         body = entry.gzip
@@ -30,6 +32,21 @@ module Campfire
     end
 
     private
+      # Rack::Files' single byte ranges: 206 with the slice, uncompressed, and the Vary that Thruster
+      # then adds a second Accept-Encoding to; 416 when nothing of the range is in the file.
+      def partial(env, headers, body)
+        ranges = Rack::Utils.get_byte_ranges(env["HTTP_RANGE"], body.bytesize)
+        return [ 200, headers.merge("content-length" => body.bytesize.to_s), env["REQUEST_METHOD"] == "HEAD" ? [] : [ body ] ] if ranges.nil? || ranges.size > 1
+        if ranges.empty?
+          return [ 416, headers.merge("content-range" => "bytes */#{body.bytesize}", "content-length" => "0"), [] ]
+        end
+
+        range = ranges.first
+        slice = body.byteslice(range)
+        headers.merge!("content-range" => "bytes #{range.begin}-#{range.end}/#{body.bytesize}", "content-length" => slice.bytesize.to_s, "vary" => "Accept-Encoding")
+        [ 206, headers, env["REQUEST_METHOD"] == "HEAD" ? [] : [ slice ] ]
+      end
+
       def load(path)
         file = File.expand_path(File.join(@root, path))
         return nil unless file.start_with?("#{@root}/") && File.file?(file)

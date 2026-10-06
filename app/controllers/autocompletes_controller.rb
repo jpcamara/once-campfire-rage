@@ -9,7 +9,7 @@ class AutocompletesController < ApplicationController
     else
       view = build_view
       html_headers
-      users.map { Autocomplete.prompt_item(view, it) }.join
+      users.map { Autocomplete.prompt_item(view, it) }.join << "\n"
     end
   end
 end

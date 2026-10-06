@@ -19,5 +19,11 @@ module Campfire
     def raw(stream, payload)
       Rage.cable.broadcast(stream, payload)
     end
+
+    # ActionCable.server.remote_connections.where(current_user: user).disconnect(reconnect:): every
+    # worker closes that user's connections.
+    def disconnect_user(user_id, reconnect: false)
+      CableProtocol.disconnect_user(user_id, reconnect: reconnect)
+    end
   end
 end

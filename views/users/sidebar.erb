@@ -19,8 +19,8 @@
           </span>
 </a>
         <div id="direct_rooms" contents data-controller="sorted-list" data-action="rooms-list:unread@window->sorted-list#updateItem">
-<% direct_memberships.each do |membership, room, members| %>
-          <%== render_sidebar_direct(membership, room, members) %>
+<% direct_memberships.each do |html| %>
+          <%== html %>
 <% end %>
         </div>
 
