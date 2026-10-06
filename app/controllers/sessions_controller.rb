@@ -13,6 +13,9 @@ class SessionsController < ApplicationController
       start_new_session_for(user)
       redirect_after_authentication
     else
+      # authenticate_by hashes the password even when no user has that email (its `new(password:)`),
+      # so a failed sign-in takes as long whether or not the address exists.
+      BCrypt::Password.create(params["password"].to_s) unless user
       render_sign_in_rejection(401)
     end
   end
