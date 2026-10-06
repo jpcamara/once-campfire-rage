@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Runs the same write flows against the reference and this app and prints each step's status and
+# redirect target side by side. Both should be on fresh seed copies.
+#   script/flows REF_BASE APP_BASE
+set -uo pipefail
+ref=$1 app=$2
+out=${OUT:-$(dirname "$0")/../../../.work-sinatra/flows}
+mkdir -p "$out"
+
+login() {
+  rm -f "$2"
+  local token
+  token=$(curl -s -c "$2" "$1/session/new" | grep -o 'name="csrf-token" content="[^"]*"' | sed 's/.*content="//;s/"$//' || true)
+  curl -s -b "$2" -c "$2" -o /dev/null -H 'sec-fetch-site: same-origin' --data-urlencode email_address=david@37signals.com \
+    --data-urlencode password=secret123456 --data-urlencode "authenticity_token=$token" "$1/session"
+}
+
+step() { # base jar method path [curl args...]
+  local base=$1 jar=$2 method=$3 path=$4; shift 4
+  local token
+  token=$(curl -s -b "$jar" "$base/rooms/654632876" | grep -o 'name="csrf-token" content="[^"]*"' | sed 's/.*content="//;s/"$//' || true)
+  curl -s -b "$jar" -c "$jar" -o /dev/null -w "%{http_code} %{redirect_url}" -X "$method" -H 'sec-fetch-site: same-origin' \
+    -H "x-csrf-token: $token" -H 'accept: text/vnd.turbo-stream.html, text/html' "$@" "$base$path" | sed "s#$base##"
+}
+
+login "$ref" "$out/ref.jar"; login "$app" "$out/app.jar"
+while IFS='|' read -r label method path args; do
+  [ -z "$label" ] && continue
+  eval "extra=($args)"
+  r=$(step "$ref" "$out/ref.jar" "$method" "$path" "${extra[@]}")
+  a=$(step "$app" "$out/app.jar" "$method" "$path" "${extra[@]}")
+  [ "$r" = "$a" ] && mark=same || mark=DIFF
+  printf '%-4s %-28s ref: %-40s app: %s\n' "$mark" "$label" "$r" "$a"
+done <<'FLOWS'
+post message|POST|/rooms/654632876/messages|--data-urlencode 'message[body]=<p>flow test</p>' --data-urlencode 'message[client_message_id]=flow1'
+boost|POST|/messages/933434506/boosts|--data-urlencode 'boost[content]=👍'
+edit message|PATCH|/rooms/654632876/messages/933434505|--data-urlencode 'message[body]=<p>edited again</p>'
+delete message|DELETE|/rooms/654632876/messages/933434482|
+involvement|PUT|/rooms/654632876/involvement?involvement=everything|
+search create|POST|/searches|--data-urlencode 'q=launch plan'
+search clear|DELETE|/searches/clear|
+new open room|POST|/rooms/opens|--data-urlencode 'room[name]=Flow room'
+new closed room|POST|/rooms/closeds|--data-urlencode 'room[name]=Flow closed' --data-urlencode 'user_ids[]=127326141' --data-urlencode 'user_ids[]=149087659'
+update room|PATCH|/rooms/closeds/486777696|--data-urlencode 'room[name]=All Talk 2' --data-urlencode 'user_ids[]=127326141'
+direct room|POST|/rooms/directs?user_ids[]=773523953|
+profile|PATCH|/users/me/profile|--data-urlencode 'user[bio]=Flow bio' --data-urlencode 'user[name]=David'
+role|PATCH|/account/users/773523953|--data-urlencode 'user[role]=administrator'
+account name|PATCH|/account|--data-urlencode 'account[name]=Flow signals'
+custom styles|PATCH|/account/custom_styles|--data-urlencode 'account[custom_styles]=body { color: red }'
+join code|POST|/account/join_code|
+new bot|POST|/account/bots|--data-urlencode 'user[name]=Flow Bot'
+bot key|PUT|/account/bots/773523956/key|
+ban|POST|/users/773523953/ban|
+unban|DELETE|/users/773523953/ban|
+deactivate|DELETE|/account/users/712064548|
+delete room|DELETE|/rooms/699448326|
+unknown message|GET|/rooms/654632876/messages/1|
+sign out|DELETE|/session|
+FLOWS

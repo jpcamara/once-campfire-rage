@@ -1,0 +1,11 @@
+<% recent_searches.each do |query| %>
+      <a class="align-center gap room btn txt-nowrap" href="/searches?q=<%= url_encode_query(query) %>">
+        <span class="overflow-ellipsis">“<%= query %>”</span>
+</a>
+<% end %>
+<% if recent_searches.any? %>
+      <form class="button_to" method="post" action="<%= base_url %>/searches/clear"><input type="hidden" name="_method" value="delete" /><button class="btn searches__btn" data-turbo-confirm="Are you sure you want to clear your recent searches?" type="submit">
+        <img aria-hidden="true" src="<%= asset_path "broom.svg" %>" />
+        <span class="for-screen-reader">Clear recent searches</span>
+</button></form>
+<% end %>

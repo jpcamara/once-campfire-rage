@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Fetches the same pages from the reference and from this app, signed in as the same user, and
+# diffs them with the parity harness's DOM normalizer (parity/capture/normalize.ts).
+#   script/compare REF_BASE APP_BASE [PATH ...]
+set -euo pipefail
+here=$(cd "$(dirname "$0")/.." && pwd)
+ref=$1 app=$2; shift 2
+paths=("$@")
+[ ${#paths[@]} -eq 0 ] && paths=(/rooms/486777696 "/rooms/486777696/messages?before=933434569" /users/me/sidebar "/searches?q=coffee" /session/new)
+out=${OUT:-$here/../../.work-sinatra/compare}
+mkdir -p "$out"
+email=${EMAIL:-david@37signals.com}
+
+login() { # base jar
+  rm -f "$2"
+  local token
+  token=$(curl -s -c "$2" "$1/session/new" | grep -o 'name="csrf-token" content="[^"]*"' | sed 's/.*content="//;s/"$//' || true)
+  curl -s -b "$2" -c "$2" -o /dev/null -H 'sec-fetch-site: same-origin' --data-urlencode "email_address=$email" \
+    --data-urlencode password=secret123456 --data-urlencode "authenticity_token=$token" "$1/session"
+}
+login "$ref" "$out/ref.jar"; login "$app" "$out/app.jar"
+status=0
+for p in "${paths[@]}"; do
+  name=$(echo "$p" | tr -c 'a-zA-Z0-9\n' '_')
+  mode=document; [[ "$p" == */messages* ]] && mode=fragment
+  curl -s -b "$out/ref.jar" "$ref$p" > "$out/$name.ref.html"
+  curl -s -b "$out/app.jar" "$app$p" > "$out/$name.app.html"
+  node "$here/script/normalize.mts" "$out/$name.ref.html" $mode | sed "s#$ref#BASE#g" > "$out/$name.ref.norm"
+  node "$here/script/normalize.mts" "$out/$name.app.html" $mode | sed "s#$app#BASE#g" > "$out/$name.app.norm"
+  if diff -q "$out/$name.ref.norm" "$out/$name.app.norm" >/dev/null; then
+    echo "same  $p ($(wc -l < "$out/$name.ref.norm") lines)"
+  else
+    echo "DIFF  $p ($(diff "$out/$name.ref.norm" "$out/$name.app.norm" | grep -c '^[<>]') lines differ) -> $out/$name.*.norm"
+    status=1
+  fi
+done
+exit $status

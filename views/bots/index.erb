@@ -1,0 +1,73 @@
+<section class="panel panel--wide txt-align-center flex flex-column position-relative" style="view-transition-name: chat-bots">
+  <div class="flex align-center gap">
+    <div class="panel__button">
+      <%== translation_button(:chat_bots) %>
+    </div>
+    <div class="pad-inline-double center">
+      <h1 class="margin-none">Chat bots</h1>
+      <p class="margin-none-block-start">With Chat bots, other sites and services can post updates directly to Campfire.</p>
+
+      <a class="btn btn--reversed txt-large" aria-label="Add a chat bot" href="/account/bots/new">
+        <img aria-hidden="true" src="<%= asset_path "bot.svg" %>" width="20" height="20" />
+        <img aria-hidden="true" src="<%= asset_path "add.svg" %>" width="20" height="20" />
+</a>    </div>
+  </div>
+
+  <div class="pad-inline pad-block-start ">
+    <menu class="flex flex-column gap margin-none pad">
+<% bots.each do |bot, rooms| %>
+<li class="flex flex-column gap flush fill-shade border-radius pad-block pad-inline-double">
+  <div class="flex align-center gap">
+    <figure class="avatar flex-item--no-shrink" style="--avatar-size: 2.65em;">
+      <%== avatar_tag bot, loading: "lazy" %>
+    </figure>
+
+    <div class="min-width">
+      <div class="overflow-ellipsis txt-large"><strong><%= bot.name %></strong></div>
+    </div>
+
+    <a class="btn flex-item-justify-end" style="view-transition-name: chat-bot-<%= bot.id %>" href="/account/bots/<%= bot.id %>/edit">
+      <img aria-hidden="true" src="<%= asset_path "pencil.svg" %>" width="20" height="20" />
+      <span class="for-screen-reader">Edit <%= bot.name %></span>
+</a>  </div>
+<% rooms.each do |room| %>
+<% url = "#{base_url}/rooms/#{room.id}/#{bot.id}-#{bot.bot_token}/messages"; text_line = "curl -d 'Hello!' #{url}"; upload_line = %[curl -F "attachment=@/path/to/file" #{url}] %>
+    <fieldset class="gap max-width pad border border-radius">
+      <legend class="min-width txt-align-start pad-inline">
+        <strong class="overflow-ellipsis"><%= room_display_name(room) %></strong>
+      </legend>
+
+      <div class="flex align-center gap">
+        <img aria-hidden="true" class="colorize--black" src="<%= asset_path "messages-outlined.svg" %>" width="24" height="24" />
+
+        <div class="flex-item-grow">
+          <input type="text" class="input full-width fill-white" value="<%= text_line %>" aria-label="curl command for posting messages" readonly>
+        </div>
+
+        <div class="txt-small">
+          <button class="btn" data-controller="copy-to-clipboard" data-action="copy-to-clipboard#copy" data-copy-to-clipboard-success-class="btn--success" data-copy-to-clipboard-content-value="<%= text_line %>">
+            <img aria-hidden="true" src="<%= asset_path "copy-paste.svg" %>" width="20" height="20" />
+            <span class="for-screen-reader">Copy message command</span>
+</button>        </div>
+      </div>
+
+      <div class="flex align-center gap">
+        <img aria-hidden="true" class="colorize--black" src="<%= asset_path "attachment.svg" %>" width="24" height="24" />
+
+        <div class="flex-item-grow">
+          <input type="text" class="input full-width fill-white" value="<%= upload_line %>" aria-label="curl command for posting attachments" readonly>
+        </div>
+
+        <div class="txt-small">
+          <button class="btn" data-controller="copy-to-clipboard" data-action="copy-to-clipboard#copy" data-copy-to-clipboard-success-class="btn--success" data-copy-to-clipboard-content-value="<%= upload_line %>">
+            <img aria-hidden="true" src="<%= asset_path "copy-paste.svg" %>" width="20" height="20" />
+            <span class="for-screen-reader">Copy attachment command</span>
+</button>        </div>
+      </div>
+    </fieldset>
+<% end %>
+</li>
+<% end %>
+    </menu>
+  </div>
+</section>

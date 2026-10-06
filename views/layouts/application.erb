@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title><%= @page_title || "Campfire" %></title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, interactive-widget=resizes-content">
+    <meta name="view-transition" content="same-origin">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+<% if current_user %>
+    <meta name="current-user-id" content="<%= current_user.id %>" /><meta name="current-user-name" content="<%= current_user.name %>" />
+<% end %>
+    <meta name="action-cable-url" content="/cable">
+
+    <meta name="vapid-public-key" content="<%= vapid_public_key %>">
+    <meta name="turbo-prefetch" content="true">
+
+    <link rel="manifest" href="/webmanifest.json">
+    <link rel="icon" href="<%= account_logo_path %>" type="image/png">
+    <link rel="apple-touch-icon" href="<%= account_logo_path %>">
+
+    <%== Assets.stylesheets %>
+<% if (styles = account&.custom_styles) %>
+    <style data-turbo-track="reload"><%== styles %></style>
+<% end %>
+
+    <%== Assets.javascripts %>
+    <%== @content_head %>
+  </head>
+
+  <body class="<%= body_classes %>" data-controller="local-time lightbox">
+    <a href="#main-content" class="skip-navigation btn">Skip to main content</a>
+
+    <nav id="nav">
+      <%== @content_nav %>
+    </nav>
+<% if (notice = flash["notice"] || flash["alert"]) %>
+    <div class="flash" data-controller="element-removal" data-action="animationend->element-removal#remove">
+      <div class="flash__inner shadow" style="<%= "--flash-background: var(--color-negative)" if flash["alert"] %>">
+<% if flash["alert"] %>
+        <%== image_tag "alert.svg", aria: { hidden: true }, size: 24, class: "colorize--white" %></span>
+<% else %>
+        <%== image_tag "check.svg", aria: { hidden: true }, size: 24, class: "colorize--white" %></span>
+<% end %>
+      </div>
+      <span class="for-screen-reader" role="alert" aria-atomic="true"><%= notice %></span>
+    </div>
+<% end %>
+
+    <main id="main-content">
+      <%== @content_main %>
+
+      <footer id="footer">
+        <%== @content_footer %>
+      </footer>
+    </main>
+
+    <aside id="sidebar" data-controller="toggle-class" data-toggle-class-toggle-class="open">
+      <%== @content_sidebar %>
+    </aside>
+
+    <%== render_lightbox %>
+
+    <a href="https://once.com" id="app-logo" target="_blank" aria-label="Once software from 37signals home page">
+      <img alt="Campfire logo" width="256" height="216" src="<%= asset_path "campfire-icon.png" %>" />
+    </a>
+  </body>
+</html>

@@ -1,0 +1,25 @@
+<li class="flex align-center gap margin-none" data-value="<%= member.name.downcase %>">
+  <figure class="avatar flex-item-no-shrink" style="--avatar-size: 4ch;">
+    <%== avatar_tag member, loading: "lazy" %>
+  </figure>
+
+  <div class="min-width">
+    <div class="overflow-ellipsis fill-shade"><strong><%= member.name %></strong></div>
+  </div>
+
+  <hr class="separator" aria-hidden="true">
+<% if can_administer %>
+<% if form_type == "open" %>
+    <img aria-hidden="true" class="colorize--black flex-item-no-shrink" src="<%= asset_path "check.svg" %>" width="20" height="20" />
+<% elsif member.id == current_user.id && !editing %>
+      <input type="hidden" name="user_ids[]" value="<%= member.id %>" />
+      <img aria-hidden="true" class="colorize--black flex-item-no-shrink" src="<%= asset_path "check.svg" %>" width="20" height="20" />
+<% else %>
+      <label class="switch flex-item-no-shrink">
+        <input type="checkbox" name="user_ids[]" value="<%= member.id %>" class="switch__input"<% if selected %> checked="checked"<% end %> />
+        <span class="switch__btn round"></span>
+        <span class="for-screen-reader">Give <%= member.name %> access to this room</span>
+      </label>
+<% end %>
+<% end %>
+</li>

@@ -1,0 +1,3 @@
+# Source to use rbenv's 3.4.5 without rv's 3.4.7 gem home.
+unset GEM_HOME GEM_PATH RUBYOPT RUBYLIB BUNDLE_PATH
+export PATH="$HOME/.rbenv/versions/3.4.5/bin:$PATH"

@@ -1,0 +1,31 @@
+  <div id="message_<%= message.client_message_id %>" class="message <%= "message--emoji" if view.emoji %>" data-controller="reply" data-user-id="<%= message.creator_id %>" data-message-id="<%= message.id %>" data-message-timestamp="<%= timestamp_ms = TimeFormat.epoch_ms(message.created_at) %>" data-message-updated-at="<%= TimeFormat.epoch_ms(message.updated_at) %>" data-sort-value="<%= timestamp_ms %>" data-messages-target="message" data-search-results-target="message" data-refresh-room-target="message" data-reply-composer-outlet="#composer">
+    <h2 class="message__day-separator"><time datetime="<%= created_at = TimeFormat.iso8601(message.created_at) %>" data-local-time-target="date"></time></h2>
+
+    <figure class="avatar message__avatar">
+      <%== avatar_tag creator %>
+    </figure>
+
+    <turbo-frame id="edit_message_<%= message.client_message_id %>">
+      <div class="message__body">
+        <div class="message__body-content">
+          <div class="message__meta">
+            <h3 class="message__heading">
+              <span class="message__author" title="<%= creator.title %>">
+                <strong data-reply-target="author"><%= creator.name %></strong>
+              </span>
+              <a target="_top" class="message__permalink" href="/rooms/<%= room.id %>/@<%= message.id %>"><time class="message__timestamp" datetime="<%= created_at %>" data-local-time-target="time"></time></a>
+              <span class="message__room">
+                <a target="_top" data-reply-target="link" href="/rooms/<%= room.id %>/@<%= message.id %>"><%= room_display_name(room, nil) %></a>
+              </span>
+            </h3>
+            <%== render_message_actions(view) %>
+          </div>
+          <div id="presentation_message_<%= message.client_message_id %>" dir="auto" data-reply-target="body" data-messages-target="body">
+  <%== view.presentation %>
+</div>
+
+          <%== render_boosts(view) %>
+        </div>
+      </div>
+    </turbo-frame>
+</div>

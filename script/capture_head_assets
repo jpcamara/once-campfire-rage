@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Captures the reference's stylesheet, importmap and modulepreload tags (and its preload Link
+# header) from a running reference app, for views/_head_assets.html. They depend only on the
+# digested assets, which public/assets copies from the same image.
+#   script/capture_head_assets http://127.0.0.1:4492
+set -euo pipefail
+base=${1:?reference base URL}
+here=$(cd "$(dirname "$0")/.." && pwd)
+page=$(curl -fsS -D "$here/.head_headers" "$base/session/new")
+printf '%s\n' "$page" | sed -n '/<link rel="stylesheet"/,/<script type="module">import "application"<\/script>/p' > "$here/views/_head_assets.html"
+grep -i '^link:' "$here/.head_headers" | sed 's/^[Ll]ink: //' | tr -d '\r' > "$here/views/_link_header.txt"
+rm -f "$here/.head_headers"
+wc -l "$here/views/_head_assets.html" "$here/views/_link_header.txt"

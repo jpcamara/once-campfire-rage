@@ -1,0 +1,6 @@
+.git
+vendor/bundle
+.bundle
+storage
+tmp
+public/assets

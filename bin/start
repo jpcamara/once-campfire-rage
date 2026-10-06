@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Container entrypoint: Redis for the sign-in rate limit (unless REDIS_URL points elsewhere), then
+# Rage's own server (Iodine) with one process per CPU on HTTP_PORT.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+export STORAGE_PATH=${STORAGE_PATH:-/rails/storage} RAGE_ENV=production
+mkdir -p "$STORAGE_PATH/db" "$STORAGE_PATH/files"
+redis_port=$(ruby -ruri -e 'u = URI(ENV.fetch("REDIS_URL", "redis://127.0.0.1:6379/0")); print u.port if %w[127.0.0.1 localhost].include?(u.host)')
+# Redis runs without LD_PRELOAD: Debian's redis-server links jemalloc, which hangs under libfaketime
+# (the parity harness's clock), and gains nothing from the app's preloaded jemalloc either.
+if [ -n "$redis_port" ]; then
+  if [ -f config/redis.conf ]; then env -u LD_PRELOAD -u FAKETIME redis-server config/redis.conf --daemonize yes >/dev/null
+  else env -u LD_PRELOAD -u FAKETIME redis-server --port "$redis_port" --bind 127.0.0.1 --save "" --appendonly no --daemonize yes >/dev/null; fi
+fi
+
+bundle exec ruby -e 'require "./config/application"; Campfire::Maintenance.boot'
+
+export WEB_CONCURRENCY=${WEB_CONCURRENCY:-$(nproc)}
+exec bundle exec rage s -b 0.0.0.0 -p "${HTTP_PORT:-80}" -e production

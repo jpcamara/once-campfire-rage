@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# On the Hetzner box: one long-lived Sinatra container like bench/run-hetzner runs it, for checks
+# and quick measurements (the Rails agent's bench/probe, on this app's own ports).
+#   script/box-probe start [IMAGE]                 fresh seed copy, container sinatra-probe on PORT
+#   script/box-probe login                         the session cookie
+#   script/box-probe load ROUTE CONC SECS [ARGS]   ROUTE: room messages sidebar search post up
+#   script/box-probe stop
+# Env: SERVER_CPUS=4-7 LOADGEN_CPUS=0-3 PORT=4490 REDIS_PORT=6391 WEB_CONCURRENCY (default: CPUs)
+set -euo pipefail
+
+BENCH_ROOT=${BENCH_ROOT:-/opt/campfire-perf/once-campfire-rust}
+SEED=$BENCH_ROOT/parity/.seed/default
+LABELS=$SEED/labels.json
+ENV_FILE=$BENCH_ROOT/parity/.env.reference
+LOADGEN=$BENCH_ROOT/target/bench/release/loadgen
+SERVER_CPUS=${SERVER_CPUS:-4-7}
+LOADGEN_CPUS=${LOADGEN_CPUS:-0-3}
+PORT=${PORT:-4490}
+REDIS_PORT=${REDIS_PORT:-6391}
+BASE=http://127.0.0.1:$PORT
+WORK=/opt/campfire-perf/.work-sinatra/probe
+NAME=sinatra-probe
+
+label() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))[sys.argv[2]])' "$LABELS" "$1"; }
+lg() { taskset -c "$LOADGEN_CPUS" "$LOADGEN" "$@"; }
+
+case "${1:-}" in
+  start)
+    image=${2:-campfire-sinatra:app}
+    docker rm -f "$NAME" >/dev/null 2>&1 || true
+    rm -rf "$WORK"; mkdir -p "$WORK/db" "$WORK/storage"
+    cp -a "$SEED/db/." "$WORK/db/"; cp -a "$SEED/storage/." "$WORK/storage/"
+    python3 - "$WORK/db/production.sqlite3" <<'PY'
+import sqlite3, sys
+db = sqlite3.connect(sys.argv[1])
+db.execute("UPDATE push_subscriptions SET endpoint = 'https://127.0.0.1:9/push/' || id")
+db.execute("UPDATE webhooks SET url = 'http://127.0.0.1:9/hook/' || id")
+db.commit()
+PY
+    chown -R 1000:1000 "$WORK"
+    ncpu=$(taskset -c "$SERVER_CPUS" nproc)
+    args=()
+    while IFS= read -r line; do args+=(-e "$line"); done < <(grep -Ev '^(#|$|WEB_CONCURRENCY|JOB_CONCURRENCY|RAILS_MAX_THREADS|RAILS_LOG_LEVEL)' "$ENV_FILE")
+    docker run -d --name "$NAME" --cpuset-cpus "$SERVER_CPUS" --user 1000:1000 --network host \
+      -e "HTTP_PORT=$PORT" "${args[@]}" -e "WEB_CONCURRENCY=${WEB_CONCURRENCY:-$ncpu}" -e "JOB_CONCURRENCY=2" \
+      -e "REDIS_URL=redis://127.0.0.1:$REDIS_PORT/0" ${EXTRA_ENV:-} \
+      -v "$WORK/db:/rails/storage/db" -v "$WORK/storage:/rails/storage/files" "$image" >/dev/null
+    for _ in $(seq 1 600); do curl -fsS -o /dev/null "$BASE/up" 2>/dev/null && { echo "up ($image)"; exit 0; }; sleep 0.1; done
+    docker logs "$NAME" 2>&1 | tail -30 >&2; exit 1 ;;
+  login)
+    if [ ! -s "$WORK/cookie" ]; then
+      lg login --base "$BASE" --email "$(label emails.david)" --password "$(label passwords.all)" \
+        | python3 -c 'import json,sys; print(json.load(sys.stdin)["cookie"])' > "$WORK/cookie"
+    fi
+    cat "$WORK/cookie" ;;
+  load)
+    route=$2 conc=$3 secs=$4; shift 4
+    cookie=$("$0" login)
+    room=$(label rooms.watercooler)
+    case "$route" in
+      room) target=(--path "/rooms/$room") ;;
+      messages) target=(--path "/rooms/$room/messages?before=$(label messages.busy_060)") ;;
+      sidebar) target=(--path /users/me/sidebar) ;;
+      search) target=(--path "/searches?q=coffee") ;;
+      up) target=(--path /up) ;;
+      post) target=(--post-room "$(label rooms.hq)" --csrf "") ;;
+      *) echo "unknown route $route" >&2; exit 2 ;;
+    esac
+    lg http --base "$BASE" --cookie "$cookie" "${target[@]}" --conc "$conc" --duration "$secs" "$@" ;;
+  stop) docker rm -f "$NAME" >/dev/null 2>&1 || true ;;
+  *) sed -n '2,/^set -euo/p' "$0" | sed '$d; s/^# \{0,1\}//'; exit 1 ;;
+esac

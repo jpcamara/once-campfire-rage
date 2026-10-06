@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Runs the app locally on a fresh copy of the parity seed: bin/dev [PORT] (default 4590).
+set -euo pipefail
+here=$(cd "$(dirname "$0")/.." && pwd)
+source "$here/.envrc-ruby"
+set -a; source "$here/../../once-campfire-rust/parity/.env.reference"; set +a
+export STORAGE_PATH=${STORAGE_PATH:-$here/tmp/storage}
+export REDIS_URL=${REDIS_URL:-redis://127.0.0.1:6392/0}
+export HTTP_PORT=${1:-4590} WEB_CONCURRENCY=${WEB_CONCURRENCY:-1} RAGE_ENV=production
+seed=$here/../../once-campfire-rust/parity/.seed/default
+rm -rf "$STORAGE_PATH" && mkdir -p "$STORAGE_PATH/db" "$STORAGE_PATH/files"
+cp "$seed/db/production.sqlite3" "$STORAGE_PATH/db/" && cp -a "$seed/storage/." "$STORAGE_PATH/files/"
+cd "$here"
+exec bundle exec rage s -p "$HTTP_PORT" -e production

@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# The reference image's default command name, so harnesses that run `bin/boot` start this app.
+exec "$(dirname "$0")/start" "$@"

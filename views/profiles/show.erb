@@ -1,0 +1,84 @@
+<section class="panel flex flex-column gap" style="view-transition-name: avatar-<%= current_user.id %>">
+  <%== render_pwa_install_instructions %>
+
+  <div class="align-center center avatar__form gap" data-controller="upload-preview">
+    <form class="txt-medium" data-controller="form" action="/users/me/profile" accept-charset="UTF-8" enctype="multipart/form-data" method="post"><input type="hidden" name="_method" value="patch" />
+      <label class="btn input--file">
+        <img aria-hidden="true" src="<%= asset_path "camera.svg" %>" width="20" height="20" />
+        <input id="file" class="input" accept="image/*" data-upload-preview-target="input" data-action="upload-preview#previewImage change-&gt;form#submit" type="file" name="user[avatar]" />
+        <span class="for-screen-reader">Upload avatar</span>
+      </label>
+</form>
+    <form data-controller="form" action="/users/me/profile" accept-charset="UTF-8" enctype="multipart/form-data" method="post"><input type="hidden" name="_method" value="patch" />
+      <label class="btn avatar input--file txt-xx-large">
+        <img aria-hidden="true" data-upload-preview-target="image" src="<%= avatar_path(current_user) %>" width="300" height="300" />
+        <input id="file" class="input" accept="image/*" data-upload-preview-target="input" data-action="upload-preview#previewImage change-&gt;form#submit" type="file" name="user[avatar]" />
+        <span class="for-screen-reader">Avatar</span>
+      </label>
+</form>
+<% if avatar_attached %>
+      <form class="button_to" method="post" action="/users/<%= current_user.id %>/avatar"><input type="hidden" name="_method" value="delete" /><button class="btn btn--negative txt-small avatar__delete-btn" type="submit">
+        <img aria-hidden="true" src="<%= asset_path "minus.svg" %>" width="20" height="20" />
+        <span class="for-screen-reader">Delete avatar</span>
+</button></form>
+<% end %>
+  </div>
+
+  <form data-controller="form" action="/users/me/profile" accept-charset="UTF-8" method="post"><input type="hidden" name="_method" value="patch" />
+    <div class="flex flex-column gap">
+      <div class="flex align-center gap">
+        <%== translation_button(:user_name) %>
+
+        <label class="flex align-center gap flex-item-grow input input--actor">
+          <input class="input txt-large " autocomplete="name" placeholder="Enter your name" autofocus="autofocus" required="required" data-1p-ignore="true" type="text" value="<%= current_user.name %>" name="user[name]" id="user_name" />
+          <img aria-hidden="true" class="colorize--black" src="<%= asset_path "person.svg" %>" width="24" height="24" />
+        </label>
+      </div>
+
+      <div class="flex align-center gap">
+        <%== translation_button(:email_address) %>
+
+        <label class="flex align-center gap flex-item-grow input input--actor">
+          <input class="input txt-large" value="<%= current_user.email_address %>" autocomplete="username" placeholder="Enter your email address" type="email" name="user[email_address]" id="user_email_address" />
+          <img aria-hidden="true" class="colorize--black" src="<%= asset_path "email.svg" %>" width="24" height="24" />
+        </label>
+      </div>
+
+      <div class="flex align-center gap">
+        <%== translation_button(:update_password) %>
+
+        <label class="flex align-center gap flex-item-grow input input--actor">
+          <input class="input txt-large" autocomplete="new-password" placeholder="Change password" maxlength="72" size="72" type="password" name="user[password]" id="user_password" />
+          <img aria-hidden="true" class="colorize--black" src="<%= asset_path "password.svg" %>" width="24" height="24" />
+        </label>
+      </div>
+
+      <div class="flex align-start gap">
+        <%== translation_button(:bio) %>
+
+        <label class="flex align--center gap flex-item--grow input input--actor">
+          <textarea class="input txt-large" placeholder="A few words about yourself…" maxlength="200" rows="3" name="user[bio]" id="user_bio">
+<%= current_user.bio %></textarea>
+          <img aria-hidden="true" class="colorize--black" src="<%= asset_path "bio.svg" %>" width="24" height="24" />
+        </label>
+      </div>
+
+      <button class="btn btn--reversed center txt-large" type="submit"><img aria-hidden="true" src="<%= asset_path "check.svg" %>" width="20" height="20" /><span class="for-screen-reader">Save changes</span></button>
+    </div>
+</form>
+  <div class="margin-block pad-inline pad-block fill-shade border-radius">
+    <menu class="flex flex-column gap margin-none pad">
+<% shared_memberships.each do |membership, room| %>
+      <%== render_profile_membership(membership, room) %>
+<% end %>
+<% if direct_memberships.any? && shared_memberships.any? %>
+        <hr class="separator full-width" style="--border-style: solid">
+<% end %>
+<% direct_memberships.each do |membership, room| %>
+      <%== render_profile_membership(membership, room) %>
+<% end %>
+    </menu>
+  </div>
+
+  <%== render_transfer(current_user) %>
+</section>

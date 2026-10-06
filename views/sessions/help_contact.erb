@@ -1,0 +1,9 @@
+<% if (owner = first_administrator) %>
+  <div class="txt-align-center margin-block-double full-width">
+    <a class="btn center" title="Email <%= owner.name %>" href="<%= "mailto:\"#{owner.name}\" <#{owner.email_address}>" %>">
+      <img aria-hidden="true" src="<%= asset_path "lifebuoy.svg" %>" />
+      <span><%= owner.email_address %></span>
+</a>
+    <div class="txt-align-center center margin-block txt-subtle">Campfire&trade; version <span class="version-badge"><%= app_version %></span></div>
+  </div>
+<% end %>

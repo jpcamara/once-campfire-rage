@@ -1,0 +1,25 @@
+
+      <div class="flex align-center gap">
+        <%== translation_button(:user_name) %>
+        <label class="flex align-center gap flex-item-grow txt-large input input--actor">
+          <input class="input" autocomplete="name" placeholder="Name" autofocus="autofocus" required="required" data-1p-ignore="true" type="text" name="user[name]" id="user_name" />
+          <img aria-hidden="true" class="colorize--black" src="<%= asset_path "person.svg" %>" width="24" height="24" />
+        </label>
+      </div>
+
+      <div class="flex align-center gap">
+        <%== translation_button(:email_address) %>
+        <label class="flex align-center gap flex-item-grow txt-large input input--actor">
+          <input class="input" autocomplete="username" placeholder="Email address" required="required" type="email" name="user[email_address]" id="user_email_address" />
+          <img aria-hidden="true" class="colorize--black" src="<%= asset_path "email.svg" %>" width="24" height="24" />
+        </label>
+      </div>
+
+      <div class="flex align-center gap">
+        <%== translation_button(:password) %>
+        <label class="flex align-center gap flex-item-grow txt-large input input--actor">
+          <input class="input" autocomplete="new-password" placeholder="Password" required="required" maxlength="72" size="72" type="password" name="user[password]" id="user_password" />
+          <img aria-hidden="true" class="colorize--black" src="<%= asset_path "password.svg" %>" width="24" height="24" />
+        </label>
+      </div>
+

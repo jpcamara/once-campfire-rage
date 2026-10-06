@@ -1,0 +1,31 @@
+<div class="flex flex-column align-center gap">
+<% url = "#{base_url}/join/#{account.join_code}"; qr = "/qr_code/#{Base64.urlsafe_encode64(url)}" %>
+  <label class="flex flex-column gap full-width" style="--row-gap: 0.5em">
+    <strong id="invite_label" class="invite-label">Share to invite more people</strong>
+    <span class="flex align-center gap input input--actor fill-white">
+      <img aria-hidden="true" class="colorize--black" src="<%= asset_path "person-add.svg" %>" width="20" height="20" />
+      <input type="text" class="input" id="invite_url" value="<%= url %>" aria-labelledby="invite_label" readonly>
+    </span>
+  </label>
+
+  <div class="flex align-center gap">
+    <a class="btn" data-lightbox-target="image" data-action="lightbox#open" data-lightbox-url-value="<%= qr %>" href="<%= qr %>">
+      <span class="for-screen-reader">Show join link QR code</span>
+      <img aria-hidden="true" class="colorize--black" src="<%= asset_path "qr-code.svg" %>" width="20" height="20" />
+</a>
+    <button class="btn" data-controller="copy-to-clipboard" data-action="copy-to-clipboard#copy" data-copy-to-clipboard-success-class="btn--success" data-copy-to-clipboard-content-value="<%= url %>">
+      <span class="for-screen-reader">Copy join link</span>
+      <img aria-hidden="true" class="colorize--black" src="<%= asset_path "copy-paste.svg" %>" width="20" height="20" />
+</button>
+    <button class="btn" hidden="hidden" data-controller="web-share" data-action="web-share#share" data-web-share-url-value="<%= url %>" data-web-share-text-value="Hit this link to join me in Campfire and start chatting." data-web-share-title-value="Link to join Campfire">
+      <span class="for-screen-reader">Share join link</span>
+      <img aria-hidden="true" class="colorize--black" src="<%= asset_path "share.svg" %>" width="20" height="20" />
+</button>
+<% if current_user.can_administer? %>
+      <form class="button_to" method="post" action="/account/join_code"><button class="btn btn--regenerate" type="submit">
+        <img aria-hidden="true" class="colorize--black" src="<%= asset_path "refresh.svg" %>" width="20" height="20" />
+        <span class="for-screen-reader">Regenerate join link</span>
+</button></form>
+<% end %>
+  </div>
+</div>

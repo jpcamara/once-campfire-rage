@@ -1,0 +1,28 @@
+class SessionsController < ApplicationController
+  action :new do
+    # SessionsController#ensure_user_exists
+    return redirect(url_for("/first_run")) unless db.value("SELECT 1 FROM users LIMIT 1")
+    render_page(:sessions_new, page_title: "Sign in", head: %(<meta name="turbo-visit-control" content="reload">), email_address: params["email_address"])
+  end
+
+  action :create do
+    verify_same_origin!
+    return render_sign_in_rejection(429) if Campfire::RateLimit.exceeded?("sessions:#{remote_ip}", limit: 10, within: 180)
+    user = repo.active_user_by_email(params["email_address"].to_s)
+    if user && user.password_digest && BCrypt::Password.new(user.password_digest) == params["password"].to_s
+      start_new_session_for(user)
+      redirect_after_authentication
+    else
+      render_sign_in_rejection(401)
+    end
+  end
+
+  action :destroy do
+    verify_same_origin!
+    require_authentication!
+    db.transaction { |w| w.run("DELETE FROM sessions WHERE id = ?", @session.id) }
+    response.delete_cookie("session_token", path: "/")
+    response.delete_cookie("_campfire_session", path: "/")
+    redirect url_for("/")
+  end
+end
