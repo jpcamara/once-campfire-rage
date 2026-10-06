@@ -65,7 +65,7 @@ module Campfire
 
     # Queries on one shard. Rows come back as arrays, in the order of the SELECT's columns.
     class Connection
-      ARGUMENT_NAMES = Array.new(64) { :"a#{it}" }.freeze
+      ARGUMENT_NAMES = Array.new(256) { :"a#{it}" }.freeze # more for longer IN lists, made as needed
 
       def initialize(sequel, statements, server)
         @sequel, @statements, @server = sequel, statements, server
@@ -99,7 +99,7 @@ module Campfire
           arguments = {}
           binds.each_with_index do |value, i|
             value = value.dup.force_encoding(Encoding::UTF_8) if value.is_a?(String) && value.encoding == Encoding::BINARY
-            arguments[ARGUMENT_NAMES[i]] = value
+            arguments[ARGUMENT_NAMES[i] || :"a#{i}"] = value
           end
           @statements.fetch(@server, type, sql, binds.size).call(arguments)
         end
