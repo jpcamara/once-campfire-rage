@@ -42,6 +42,12 @@ module Campfire
     View.compile(ROOT)
   end
 
+  # Local file IO outside the fiber scheduler. Rage hands reads to Iodine, which waits for a readiness
+  # event between 64 KB chunks of a regular file; on an idle server that event only comes with the
+  # next unrelated request, so a larger file stalls the request reading it. Plain blocking reads of
+  # local files are what the other servers do.
+  def self.file_io(&) = Fiber.blocking(&)
+
   # Process-wide state: the database, secrets and caches. Opened lazily, after Iodine forks.
   def self.runtime
     return @runtime if @runtime_pid == Process.pid

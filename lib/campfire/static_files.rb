@@ -15,7 +15,7 @@ module Campfire
 
     def call(env)
       path = Rack::Utils.unescape_path(env["PATH_INFO"])
-      entry = @entries[path] ||= load(path)
+      entry = @entries[path] ||= Campfire.file_io { load(path) }
       return [ 404, { "content-type" => "text/plain" }, [ "Not found" ] ] unless entry
 
       headers = { "cache-control" => @cache_control, "content-type" => entry.type, "last-modified" => entry.last_modified }

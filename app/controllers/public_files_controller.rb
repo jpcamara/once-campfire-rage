@@ -6,6 +6,6 @@ class PublicFilesController < ApplicationController
     without_version_headers
     headers "cache-control" => "public, max-age=2592000", "last-modified" => File.mtime(path).httpdate,
       "content-type" => request.path_info.end_with?(".txt") ? "text/plain" : "text/html"
-    File.read(path)
+    Campfire.file_io { File.read(path) }
   end
 end

@@ -105,7 +105,7 @@ module Campfire
       @__headers = Rack::Headers.new
       @status = 500
       @__headers["content-type"] = "text/html; charset=utf-8"
-      finish(File.read(File.join(ROOT, "public/500.html")))
+      finish(Campfire.file_io { File.read(File.join(ROOT, "public/500.html")) })
     end
 
     # ActionDispatch's default headers on every controller response, ApplicationController's
@@ -200,7 +200,7 @@ module Campfire
       status_code, file_headers, file_body = Rack::Files.new(File.dirname(path)).serving(request, path)
       file_headers.each { |name, value| @__headers[name] ||= value }
       @__headers["content-length"] = file_headers["content-length"]
-      halt status_code, file_body
+      halt status_code, Campfire.file_io { (+"").b.tap { |content| file_body.each { content << it } } }
     rescue Errno::ENOENT
       record_not_found!
     end
@@ -264,7 +264,7 @@ module Campfire
       without_security_headers
       headers "content-type" => type, "content-transfer-encoding" => "binary",
         "content-disposition" => Storage.content_disposition("inline", File.basename(path))
-      File.binread(path)
+      Campfire.file_io { File.binread(path) }
     end
 
     # The ETag of a page built from cached message fragments: everything it's rendered from.
@@ -323,14 +323,14 @@ module Campfire
     def record_not_found!
       without_security_headers
       without_version_headers
-      halt 404, { "content-type" => "text/html; charset=UTF-8" }, File.read(File.join(ROOT, "public/404.html"))
+      halt 404, { "content-type" => "text/html; charset=UTF-8" }, Campfire.file_io { File.read(File.join(ROOT, "public/404.html")) }
     end
 
     # Active Storage's controllers aren't ApplicationControllers: a missing blob is the public 404
     # page, without version headers.
     def active_storage_not_found
       without_version_headers
-      halt 404, { "content-type" => "text/html", "cache-control" => "no-cache" }, File.read(File.join(ROOT, "public/404.html"))
+      halt 404, { "content-type" => "text/html", "cache-control" => "no-cache" }, Campfire.file_io { File.read(File.join(ROOT, "public/404.html")) }
     end
 
     # ActiveStorage::Blobs::RedirectController and Representations::RedirectController

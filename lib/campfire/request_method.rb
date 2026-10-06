@@ -5,24 +5,36 @@ module Campfire
   # form itself; the body is only parsed when it mentions `_method`.
   class RequestMethod
     OVERRIDABLE = %w[ GET HEAD PUT POST DELETE OPTIONS PATCH LINK UNLINK ].freeze
+    TRACE = ENV["CAMPFIRE_TRACE"] # debugging: each request's start and end on stdout
 
     def initialize(app)
       @app = app
     end
 
     def call(env)
-      case env["REQUEST_METHOD"]
-      when "POST" then override(env)
-      when "HEAD"
-        env["REQUEST_METHOD"] = "GET"
-        status, headers, body = @app.call(env)
-        body.close if body.respond_to?(:close)
-        return [ status, headers, [] ]
-      end
-      @app.call(env)
+      TRACE ? traced(env) : dispatch(env)
     end
 
     private
+      def traced(env)
+        id = "#{Process.pid}-#{env.object_id}"
+        $stdout.puts("> #{id} #{env["REQUEST_METHOD"]} #{env["PATH_INFO"]}")
+        $stdout.flush
+        dispatch(env).tap { $stdout.puts("< #{id} #{it[0]}"); $stdout.flush }
+      end
+
+      def dispatch(env)
+        case env["REQUEST_METHOD"]
+        when "POST" then override(env)
+        when "HEAD"
+          env["REQUEST_METHOD"] = "GET"
+          status, headers, body = @app.call(env)
+          body.close if body.respond_to?(:close)
+          return [ status, headers, [] ]
+        end
+        @app.call(env)
+      end
+
       def override(env)
         method = env["HTTP_X_HTTP_METHOD_OVERRIDE"] || form_method(env)
         method = method.to_s.upcase

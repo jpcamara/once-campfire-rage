@@ -8,6 +8,6 @@ class PwaController < ApplicationController
 
   action :service_worker do
     headers "content-type" => "text/javascript; charset=utf-8", "cache-control" => "max-age=0, private, must-revalidate"
-    File.read(File.join(Campfire::ROOT, "public/service-worker.js"))
+    Campfire.file_io { File.read(File.join(Campfire::ROOT, "public/service-worker.js")) }
   end
 end
