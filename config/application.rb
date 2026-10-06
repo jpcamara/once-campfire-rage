@@ -11,8 +11,10 @@ Rage.configure do
   # Jobs run in this process, in memory, as the Rust port's do.
   config.deferred.backend = nil
 
-  # Thruster's gzip and Rails' Rack::ETag, the forms' method override, digested assets from memory.
+  # The forms' method override, Thruster's response cache and gzip, Rails' Rack::ETag, digested
+  # assets from memory.
   config.middleware.use Campfire::RequestMethod
+  config.middleware.use Campfire::ResponseCache
   config.middleware.use Campfire::Compression
   config.middleware.use Campfire::ETag
   config.middleware.use Campfire::AssetFiles

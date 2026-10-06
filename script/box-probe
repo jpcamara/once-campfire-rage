@@ -3,7 +3,7 @@
 # and quick measurements (the Rails agent's bench/probe, on this app's own ports).
 #   script/box-probe start [IMAGE]                 fresh seed copy, container rage-probe on PORT
 #   script/box-probe login                         the session cookie
-#   script/box-probe load ROUTE CONC SECS [ARGS]   ROUTE: room messages sidebar search post up
+#   script/box-probe load ROUTE CONC SECS [ARGS]   ROUTE: room messages sidebar search post up avatar css
 #   script/box-probe stop
 # Env: SERVER_CPUS=4-7 LOADGEN_CPUS=0-3 PORT=4590 REDIS_PORT=6392 WEB_CONCURRENCY (default: CPUs)
 set -euo pipefail
@@ -63,6 +63,8 @@ PY
       sidebar) target=(--path /users/me/sidebar) ;;
       search) target=(--path "/searches?q=coffee") ;;
       up) target=(--path /up) ;;
+      avatar) target=(--path "/users/$(label avatar_tokens.jason)/avatar") ;;
+      css) target=(--path "/assets/$(ls /opt/campfire-perf/apps/rage/public/assets | grep '^_reset-.*[.]css$' | head -1)") ;;
       post) target=(--post-room "$(label rooms.hq)" --csrf "") ;;
       *) echo "unknown route $route" >&2; exit 2 ;;
     esac

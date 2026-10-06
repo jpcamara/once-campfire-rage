@@ -35,6 +35,7 @@ require_relative "campfire/etag"
 require_relative "campfire/unfurl"
 require_relative "campfire/static_files"
 require_relative "campfire/request_method"
+require_relative "campfire/response_cache"
 require_relative "campfire/form_params"
 
 module Campfire
