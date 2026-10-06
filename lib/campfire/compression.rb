@@ -29,7 +29,7 @@ module Campfire
 
       if body.is_a?(FragmentBody)
         compressed = body.gzip
-      elsif (digest = env[ETag::BODY_DIGEST])
+      elsif (digest = env[ETag::BODY_DIGEST]) && env["REQUEST_METHOD"] == "GET" # a write's response is its own
         compressed = kept(digest) { gzip(body) }
       else
         compressed = gzip(body)
