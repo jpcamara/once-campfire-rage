@@ -53,17 +53,20 @@ module Campfire
       block
     end
 
-    # Splits rendered HTML on the markers View#render_message_cached left for each fragment.
+    # Splits rendered HTML on the markers View#render_message_cached left for each fragment. Byte
+    # offsets: the page has multi-byte characters, so character offsets walk it from the start on
+    # every slice.
     def self.from(html, fragments)
       parts = []
       last = 0
       html.scan(MARKER) do
         match = Regexp.last_match
-        parts << html[last...match.begin(0)] if match.begin(0) > last
+        start, finish = match.byteoffset(0)
+        parts << html.byteslice(last, start - last) if start > last
         parts << fragments[match[1].to_i]
-        last = match.end(0)
+        last = finish
       end
-      parts << html[last..] if last < html.size
+      parts << html.byteslice(last, html.bytesize - last) if last < html.bytesize
       new(parts)
     end
 
