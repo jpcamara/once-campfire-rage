@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# On the Hetzner box: one long-lived Sinatra container like bench/run-hetzner runs it, for checks
+# On the Hetzner box: one long-lived Rage container like bench/run-hetzner runs it, for checks
 # and quick measurements (the Rails agent's bench/probe, on this app's own ports).
-#   script/box-probe start [IMAGE]                 fresh seed copy, container sinatra-probe on PORT
+#   script/box-probe start [IMAGE]                 fresh seed copy, container rage-probe on PORT
 #   script/box-probe login                         the session cookie
 #   script/box-probe load ROUTE CONC SECS [ARGS]   ROUTE: room messages sidebar search post up
 #   script/box-probe stop
-# Env: SERVER_CPUS=4-7 LOADGEN_CPUS=0-3 PORT=4490 REDIS_PORT=6391 WEB_CONCURRENCY (default: CPUs)
+# Env: SERVER_CPUS=4-7 LOADGEN_CPUS=0-3 PORT=4590 REDIS_PORT=6392 WEB_CONCURRENCY (default: CPUs)
 set -euo pipefail
 
 BENCH_ROOT=${BENCH_ROOT:-/opt/campfire-perf/once-campfire-rust}
@@ -15,18 +15,18 @@ ENV_FILE=$BENCH_ROOT/parity/.env.reference
 LOADGEN=$BENCH_ROOT/target/bench/release/loadgen
 SERVER_CPUS=${SERVER_CPUS:-4-7}
 LOADGEN_CPUS=${LOADGEN_CPUS:-0-3}
-PORT=${PORT:-4490}
-REDIS_PORT=${REDIS_PORT:-6391}
+PORT=${PORT:-4590}
+REDIS_PORT=${REDIS_PORT:-6392}
 BASE=http://127.0.0.1:$PORT
-WORK=/opt/campfire-perf/.work-sinatra/probe
-NAME=sinatra-probe
+WORK=/opt/campfire-perf/.work-rage/probe
+NAME=rage-probe
 
 label() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))[sys.argv[2]])' "$LABELS" "$1"; }
 lg() { taskset -c "$LOADGEN_CPUS" "$LOADGEN" "$@"; }
 
 case "${1:-}" in
   start)
-    image=${2:-campfire-sinatra:app}
+    image=${2:-campfire-rage:app}
     docker rm -f "$NAME" >/dev/null 2>&1 || true
     rm -rf "$WORK"; mkdir -p "$WORK/db" "$WORK/storage"
     cp -a "$SEED/db/." "$WORK/db/"; cp -a "$SEED/storage/." "$WORK/storage/"

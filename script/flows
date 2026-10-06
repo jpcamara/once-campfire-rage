@@ -4,7 +4,7 @@
 #   script/flows REF_BASE APP_BASE
 set -uo pipefail
 ref=$1 app=$2
-out=${OUT:-$(dirname "$0")/../../../.work-sinatra/flows}
+out=${OUT:-$(dirname "$0")/../../../.work-rage/flows}
 mkdir -p "$out"
 
 login() {

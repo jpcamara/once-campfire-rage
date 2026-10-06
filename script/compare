@@ -7,7 +7,7 @@ here=$(cd "$(dirname "$0")/.." && pwd)
 ref=$1 app=$2; shift 2
 paths=("$@")
 [ ${#paths[@]} -eq 0 ] && paths=(/rooms/486777696 "/rooms/486777696/messages?before=933434569" /users/me/sidebar "/searches?q=coffee" /session/new)
-out=${OUT:-$here/../../.work-sinatra/compare}
+out=${OUT:-$here/../../.work-rage/compare}
 mkdir -p "$out"
 email=${EMAIL:-david@37signals.com}
 
