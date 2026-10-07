@@ -51,14 +51,11 @@ module Campfire
       end
     end
 
-    # Users::AvatarsController#render_initials, kept per user version.
+    # Users::AvatarsController#render_initials
     def initials_svg(user)
-      @initials = {} if Campfire.rust_caching_only?
-      (@initials ||= {})[[ user.id, user.name ]] ||= begin
-        initials = user.initials
-        length = initials.size >= 3 ? 'textLength="85%" lengthAdjust="spacingAndGlyphs"' : ""
-        format(SVG, View::AVATAR_COLORS[Zlib.crc32(user.to_param) % View::AVATAR_COLORS.size], length, HTML.h(initials)).freeze
-      end
+      initials = user.initials
+      length = initials.size >= 3 ? 'textLength="85%" lengthAdjust="spacingAndGlyphs"' : ""
+      format(SVG, View::AVATAR_COLORS[Zlib.crc32(user.to_param) % View::AVATAR_COLORS.size], length, HTML.h(initials))
     end
 
     # User::Avatar#avatar_variant: the 512px webp square, built on first request.
