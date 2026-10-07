@@ -138,7 +138,6 @@ module Campfire
         @signed_ids = MessageVerifier.new(keys.generate_key("active_record/signed_id"), digest: "SHA256", format: :envelope_data)
         @turbo_streams = MessageVerifier.new(keys.generate_key("turbo/signed_stream_verifier_key"), digest: "SHA256", format: :bare)
         @global_ids = MessageVerifier.new(keys.generate_key("signed_global_ids"), digest: "SHA1", format: :envelope_data, padding: true)
-        @stream_names = {}
       end
 
       # cookies.signed.permanent[name] = value (the :json cookie serializer dumps the string first)
@@ -181,8 +180,7 @@ module Campfire
       end
 
       def signed_stream_name(name)
-        return @turbo_streams.generate(name).freeze if Campfire.rust_caching_only?
-        @stream_names[name] ||= @turbo_streams.generate(name).freeze
+        @turbo_streams.generate(name)
       end
 
       def verified_stream_name(signed)
