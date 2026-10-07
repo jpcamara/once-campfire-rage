@@ -11,8 +11,8 @@ class InvolvementsController < ApplicationController
 
   action :update do
     room_id = id_param("room_id")
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     membership = repo.membership(current_user.id, room_id) or record_not_found!
     Involvements.update(self, membership, params["involvement"].to_s)
     redirect url_for("/rooms/#{membership.room_id}/involvement")

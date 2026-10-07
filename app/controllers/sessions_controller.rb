@@ -21,8 +21,8 @@ class SessionsController < ApplicationController
   end
 
   action :destroy do
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     db.transaction { |w| w.run("DELETE FROM sessions WHERE id = ?", @session.id) }
     Broadcasts.disconnect_user(current_user.id, reconnect: true) # Authentication#disconnect_remote_connections
     response.delete_cookie("session_token", path: "/")

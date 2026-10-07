@@ -24,8 +24,8 @@ class RoomSettingsController < ApplicationController
   end
 
   action :create do
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     head_response(403) unless can_create_rooms?
     room = Rooms.create(self, room_type, (params["room"] || {})["name"].to_s, Array(params["user_ids"]))
     redirect url_for("/rooms/#{room.id}")
@@ -33,8 +33,8 @@ class RoomSettingsController < ApplicationController
 
   action :update do
     id = id_param("id")
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     room = repo.user_room(current_user.id, id)
     return redirect_with_alert("/", "Room not found or inaccessible") unless room && !room.direct?
     head_response(403) unless current_user.can_administer?(room)

@@ -51,8 +51,8 @@ class MessagesController < ApplicationController
 
   action :create do
     room_id = id_param("room_id")
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     membership = repo.membership(current_user.id, room_id)
     return render_room_not_found unless membership
 
@@ -88,8 +88,8 @@ class MessagesController < ApplicationController
 
   action :update do
     room_id, id = id_param("room_id"), id_param("id")
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     room = room_scoped!(room_id)
     message = repo.room_message(room.id, id) or record_not_found!
     head_response(403) unless current_user.can_administer?(message)
@@ -99,8 +99,8 @@ class MessagesController < ApplicationController
 
   action :destroy do
     room_id, id = id_param("room_id"), id_param("id")
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     room = room_scoped!(room_id)
     message = repo.room_message(room.id, id) or record_not_found!
     head_response(403) unless current_user.can_administer?(message)

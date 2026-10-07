@@ -445,14 +445,27 @@ module Campfire
       redirect url_for(path)
     end
 
-    # Sec-Fetch-Site replaces CSRF tokens, as in the Rust port: cross-site writes are rejected,
-    # and so is a mismatched Origin.
+    # Sec-Fetch-Site replaces CSRF tokens, as in the Rust port (kit/src/ctx.rs
+    # verify_authenticity_token): the Origin, if sent, must be this app's (a "null" one is
+    # rejected); then same-origin and same-site writes pass, and a missing header passes only when
+    # neither the request nor the app uses SSL. Anything else is InvalidAuthenticityToken: the public
+    # 422 page, as ActionDispatch::ShowExceptions serves it.
     def verify_same_origin!
-      site = env["HTTP_SEC_FETCH_SITE"]
       origin = env["HTTP_ORIGIN"]
-      forbidden = site == "cross-site" || (site.nil? && request.scheme == "https") ||
-        (origin && origin != "null" && origin != base_url)
-      halt 422, "" if forbidden
+      valid_origin = origin.nil? || (origin != "null" && origin == base_url)
+      valid_site =
+        case env["HTTP_SEC_FETCH_SITE"]
+        when "same-origin", "same-site" then true
+        when nil then request.scheme != "https" && !SSL.enabled?
+        else false
+        end
+      invalid_authenticity_token! unless valid_origin && valid_site
+    end
+
+    def invalid_authenticity_token!
+      without_security_headers
+      without_version_headers
+      halt 422, { "content-type" => "text/html; charset=UTF-8" }, Campfire.file_io { File.read(File.join(ROOT, "public/422.html")) }
     end
   end
 end

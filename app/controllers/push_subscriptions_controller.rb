@@ -7,8 +7,8 @@ class PushSubscriptionsController < ApplicationController
   end
 
   action :create do
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     attributes = params["push_subscription"] || {}
     halt 400, "" if attributes.empty?
     status PushSubscriptions.create(self, attributes) ? 200 : 422
@@ -17,16 +17,16 @@ class PushSubscriptionsController < ApplicationController
 
   action :destroy do
     id = id_param("id")
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     db.transaction { |w| w.run("DELETE FROM push_subscriptions WHERE id = ? AND user_id = ?", id, current_user.id) }
     redirect url_for("/users/me/push_subscriptions")
   end
 
   action :test do
     id = id_param("id")
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     row = db.row("SELECT endpoint, p256dh_key, auth_key FROM push_subscriptions WHERE id = ? AND user_id = ?", id, current_user.id) or record_not_found!
     payload = { title: "Campfire Test", body: SecureRandom.uuid, path: url_for("/users/me/push_subscriptions") }
     badge = db.value("SELECT COUNT(*) FROM memberships WHERE user_id = ? AND unread_at IS NOT NULL", current_user.id)

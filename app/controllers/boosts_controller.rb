@@ -18,8 +18,8 @@ class BoostsController < ApplicationController
 
   action :create do
     message_id = id_param("message_id")
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     message = reachable_message!(message_id)
     Boosts.create(self, message, (params["boost"] || {})["content"].to_s)
     redirect url_for("/messages/#{message.id}/boosts")
@@ -27,8 +27,8 @@ class BoostsController < ApplicationController
 
   action :destroy do
     message_id, id = id_param("message_id"), id_param("id")
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     message = reachable_message!(message_id)
     Boosts.destroy(self, message, id) or record_not_found!
     status 204

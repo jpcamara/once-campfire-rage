@@ -25,8 +25,8 @@ class RoomsController < ApplicationController
 
   action :destroy do
     id = id_param("id")
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     room = repo.user_room(current_user.id, id)
     return redirect_with_alert("/", "Room not found or inaccessible") unless room && (room.direct? == request.path_info.include?("/directs/"))
     head_response(403) unless room.direct? || current_user.can_administer?(room)

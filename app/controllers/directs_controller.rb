@@ -6,8 +6,8 @@ class DirectsController < ApplicationController
   end
 
   action :create do
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     room = Rooms.find_or_create_direct(self, (Array(params["user_ids"]).map(&:to_i) + [ current_user.id ]).uniq)
     redirect url_for("/rooms/#{room.id}")
   end

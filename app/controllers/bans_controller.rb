@@ -1,8 +1,8 @@
 class BansController < ApplicationController
   action :create do
     id = id_param("id")
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     head_response(403) unless current_user.can_administer?
     user = repo.user(id) or record_not_found!
     Bans.ban(self, user)
@@ -11,8 +11,8 @@ class BansController < ApplicationController
 
   action :destroy do
     id = id_param("id")
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     head_response(403) unless current_user.can_administer?
     user = repo.user(id) or record_not_found!
     Bans.unban(self, user)

@@ -13,8 +13,8 @@ class AccountUsersController < ApplicationController
 
   action :update do
     id = id_param("id")
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     head_response(403) unless current_user.can_administer?
     user = repo.user(id)
     record_not_found! unless user&.active?
@@ -25,8 +25,8 @@ class AccountUsersController < ApplicationController
 
   action :destroy do
     id = id_param("id")
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     head_response(403) unless current_user.can_administer?
     user = repo.user(id)
     record_not_found! unless user&.active?

@@ -9,16 +9,16 @@ class ProfilesController < ApplicationController
   end
 
   action :update do
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     attributes = params["user"] || {}
     Profiles.update(self, current_user, attributes)
     redirect_with_notice("/users/me/profile", attributes["avatar"] ? "It may take up to 30 minutes to change everywhere." : "✓")
   end
 
   action :remove_avatar do
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     Profiles.remove_avatar(self, current_user)
     redirect url_for("/users/me/profile")
   end

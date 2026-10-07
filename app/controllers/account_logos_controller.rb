@@ -4,8 +4,8 @@ class AccountLogosController < ApplicationController
   end
 
   action :destroy do
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     head_response(403) unless current_user.can_administer?
     db.transaction do |w|
       w.run("DELETE FROM active_storage_attachments WHERE record_type = 'Account' AND name = 'logo'")

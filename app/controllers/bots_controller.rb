@@ -33,8 +33,8 @@ class BotsController < ApplicationController
   end
 
   action :create do
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     head_response(403) unless current_user.can_administer?
     BotAccounts.create(self, params["user"] || {})
     redirect url_for("/account/bots")
@@ -42,8 +42,8 @@ class BotsController < ApplicationController
 
   action :update do
     id = id_param("id")
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     head_response(403) unless current_user.can_administer?
     BotAccounts.update(self, active_bot!(id), params["user"] || {})
     redirect url_for("/account/bots")
@@ -51,8 +51,8 @@ class BotsController < ApplicationController
 
   action :reset_key do
     id = id_param("id")
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     head_response(403) unless current_user.can_administer?
     bot = active_bot!(id)
     db.transaction { |w| w.run("UPDATE users SET bot_token = ?, updated_at = ? WHERE id = ?", SecureRandom.alphanumeric(12), TimeFormat.now_text, bot.id) }
@@ -61,8 +61,8 @@ class BotsController < ApplicationController
 
   action :destroy do
     id = id_param("id")
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     head_response(403) unless current_user.can_administer?
     Accounts.deactivate(self, active_bot!(id))
     redirect url_for("/account/bots")

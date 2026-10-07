@@ -11,16 +11,16 @@ class AccountsController < ApplicationController
   end
 
   action :update do
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     head_response(403) unless current_user.can_administer?
     Accounts.update(self, params["account"] || {})
     redirect_with_notice("/account/edit", "✓")
   end
 
   action :reset_join_code do
-    verify_same_origin!
     require_authentication!
+    verify_same_origin!
     head_response(403) unless current_user.can_administer?
     code = SecureRandom.alphanumeric(12).scan(/.{4}/).join("-")
     db.transaction { |w| w.run("UPDATE accounts SET join_code = ?, updated_at = ?", code, TimeFormat.now_text) }
