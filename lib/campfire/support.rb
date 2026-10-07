@@ -412,7 +412,8 @@ module Campfire
     def create(ctx, attributes, role: 0)
       now = TimeFormat.now_text
       digest = BCrypt::Password.create(attributes["password"].to_s, cost: BCrypt::Engine::DEFAULT_COST)
-      email = attributes["email_address"].to_s.strip.downcase
+      # Stored as typed: the reference doesn't normalize email addresses, and signs in by an exact match.
+      email = attributes["email_address"].to_s
       user_id = ctx.db.transaction do |w|
         next nil if w.value("SELECT 1 FROM users WHERE email_address = ?", email)
         w.run("INSERT INTO users (created_at, email_address, name, password_digest, role, status, updated_at) VALUES (?, ?, ?, ?, ?, 0, ?)",
@@ -461,7 +462,7 @@ module Campfire
       now = TimeFormat.now_text
       ctx.db.transaction do |w|
         w.run("UPDATE users SET name = ?, updated_at = ? WHERE id = ?", attributes["name"], now, user.id) if attributes.key?("name") && !attributes["name"].to_s.empty?
-        w.run("UPDATE users SET email_address = ?, updated_at = ? WHERE id = ?", attributes["email_address"].to_s.strip.downcase, now, user.id) if attributes.key?("email_address")
+        w.run("UPDATE users SET email_address = ?, updated_at = ? WHERE id = ?", attributes["email_address"].to_s, now, user.id) if attributes.key?("email_address")
         w.run("UPDATE users SET bio = ?, updated_at = ? WHERE id = ?", attributes["bio"], now, user.id) if attributes.key?("bio")
         unless attributes["password"].to_s.empty?
           w.run("UPDATE users SET password_digest = ?, updated_at = ? WHERE id = ?", BCrypt::Password.create(attributes["password"]).to_s, now, user.id)
