@@ -1,0 +1,33 @@
+#!/usr/bin/env ruby
+# The app's own versions of reference assets (overrides/, as the Rust port's crates/assets/overrides),
+# installed over the reference's digested assets at build time: each goes in under the digest of its
+# own content, and the manifest, import map and preload header point at it instead.
+#   models/file_uploader.js: sends no X-CSRF-Token, since pages carry no CSRF meta tag (writes are
+#   checked with Sec-Fetch-Site, README "Known differences").
+require "json"
+require "digest"
+
+root = File.expand_path("..", __dir__)
+assets = File.join(root, "public/assets")
+manifest_path = File.join(assets, ".manifest.json")
+manifest = JSON.parse(File.read(manifest_path))
+views = %w[ views/_head_assets.html views/_link_header.txt ].to_h { [ it, File.read(File.join(root, it)) ] }
+
+Dir.glob("**/*", base: File.join(root, "overrides")).sort.each do |logical|
+  source = File.join(root, "overrides", logical)
+  next unless File.file?(source)
+
+  content = File.binread(source)
+  extension = File.extname(logical)
+  digested = "#{logical.delete_suffix(extension)}-#{Digest::SHA1.hexdigest(content)[0, 8]}#{extension}"
+  replaced = manifest.fetch(logical).fetch("digested_path")
+
+  File.binwrite(File.join(assets, digested), content)
+  File.delete(File.join(assets, replaced)) if File.exist?(File.join(assets, replaced))
+  manifest[logical] = manifest[logical].merge("digested_path" => digested)
+  views.transform_values! { it.gsub("/assets/#{replaced}", "/assets/#{digested}") }
+  puts "#{logical}: #{replaced} -> #{digested}"
+end
+
+File.write(manifest_path, JSON.generate(manifest))
+views.each { |path, text| File.write(File.join(root, path), text) }

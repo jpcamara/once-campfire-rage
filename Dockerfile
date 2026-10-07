@@ -22,8 +22,9 @@ RUN apt-get update -qq && \
 COPY Gemfile Gemfile.lock ./
 RUN bundle install && rm -rf ~/.bundle/ "${BUNDLE_PATH}"/ruby/*/cache
 COPY . .
-# The reference's digested assets, so asset paths match it exactly.
+# The reference's digested assets, so asset paths match it exactly, with the app's own overrides.
 COPY --from=reference /rails/public/assets /rails/public/assets
+RUN bin/install-asset-overrides
 
 FROM base
 RUN groupadd --system --gid 1000 rails && useradd rails --uid 1000 --gid 1000 --create-home --shell /bin/bash

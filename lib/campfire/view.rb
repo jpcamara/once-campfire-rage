@@ -38,12 +38,6 @@ module Campfire
 
     def h(value) = HTML.h(value)
 
-    # csrf_meta_tags' token, in Rails' masked-token shape. Writes are checked with Sec-Fetch-Site
-    # and Origin instead (as in the Rust port); the token is there for models/file_uploader.js,
-    # which reads it into an X-CSRF-Token header. Nothing checks it, so one per process does: the
-    # page stays the same from request to request, and its compressed parts can be kept.
-    CSRF_TOKEN = SecureRandom.urlsafe_base64(64).freeze
-    def csrf_token = CSRF_TOKEN
     def asset_path(logical) = Assets.path(logical)
     def platform = (@platform ||= Platform.new(@user_agent))
     def account = app.account
