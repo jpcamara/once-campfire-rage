@@ -63,6 +63,31 @@ traffic:
 The per-change table below comes from the A/B run for each step. Each step was measured against
 the commit just before it, so the percentages don't multiply exactly into the totals.
 
+## Compared with Rust on the same box
+
+DHH's [Rust port](https://github.com/basecamp/once-campfire-rust) (`ccece30`) was built and run on the
+same Hetzner box, in the same session as stock Rails and the three Ruby apps. Settings: 16 clients, four
+hardware threads per app, median of 3 alternating reps. Each app ran with its default caching.
+
+| HTTP workload (requests/sec) | Rails | Rails (optimized) | Sinatra | Rage | Rust |
+|---|---:|---:|---:|---:|---:|
+| Room page | 225 | 551 | 12,861 | 10,127 | 21,229 |
+| Messages page | 360 | 1,984 | 19,729 | 24,638 | 23,565 |
+| Sidebar | 480 | 3,562 | 22,936 | 32,975 | 20,828 |
+| Search | 382 | 863 | 15,700 | 16,910 | 21,276 |
+| Post a message | 198 | 261 | 3,195 | 1,833 | 4,153 |
+| Avatar | 61,687 | 62,178 | 72,081 | 181,576 | 196,297 |
+| Cable p50, 1,000 clients | 44.6 ms | 40.9 ms | 9.0 ms | 5.0 ms | 4.3 ms |
+| Idle memory | 282 MB | 617 MB | 201 MB | 170 MB | 13 MB |
+
+With only the caching Rust does (`CAMPFIRE_CACHING=rust`), the Ruby apps read at roughly a quarter to a
+third of Rust's rate. Sinatra posts at three-quarters of Rust's rate. The extra caches all come from
+Elixir's port, and they're what let Ruby match Rust on the messages page and sidebar.
+
+**Hardware.** This box is slower than DHH's. On it, Rust runs at about 60% of his published numbers
+(room 21,229 vs 36,260). Stock Rails runs at 73–93% of his. So comparing these numbers with his table
+overstates the gap between Ruby and Rust by about 1.7×.
+
 ## Caching
 
 The rule here: only cache what the Rust or Elixir ports cache, checked against their source.
