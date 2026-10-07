@@ -1,3 +1,4 @@
+require "securerandom"
 require "zlib"
 
 module Campfire
@@ -67,9 +68,12 @@ module Campfire
   # pieces as they are; gzip clients get the cached deflate blocks of each run of fragments and of
   # each literal segment.
   class FragmentBody
-    MARKER = /\u0001(\d+)\u0002/
+    # Markers carry a random token made at boot, so text a user controls (a room name, a search
+    # query) can't pass for one: the token never reaches a page.
+    TOKEN = SecureRandom.hex(16).freeze
+    MARKER = /\u0001#{TOKEN}:(\d+)\u0002/
 
-    def self.marker(index) = "\u0001#{index}\u0002"
+    def self.marker(index) = "\u0001#{TOKEN}:#{index}\u0002"
 
     def self.deflate_block(string)
       deflater = Zlib::Deflate.new(Zlib::DEFAULT_COMPRESSION, -Zlib::MAX_WBITS)
@@ -86,9 +90,10 @@ module Campfire
       last = 0
       html.scan(MARKER) do
         match = Regexp.last_match
+        fragment = fragments.fetch(match[1].to_i)
         start, finish = match.byteoffset(0)
         parts << html.byteslice(last, start - last) if start > last
-        parts << fragments[match[1].to_i]
+        parts << fragment
         last = finish
       end
       parts << html.byteslice(last, html.bytesize - last) if last < html.bytesize
