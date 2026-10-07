@@ -7,7 +7,7 @@ encrypted cookies compatible, so sessions carry over. From the outside it behave
 app. That's checked with the Playwright parity harness from DHH's
 [once-campfire-rust](https://github.com/basecamp/once-campfire-rust).
 
-One of three Ruby implementations benchmarked together. The benchmark notes, harness changes,
+One of four Ruby implementations benchmarked together. The benchmark notes, harness changes,
 per-change measurements and raw results are on the
 [`benchmarks` branch](https://github.com/jpcamara/once-campfire-sinatra/tree/benchmarks) of the
 Sinatra repo.
@@ -17,6 +17,7 @@ Sinatra repo.
 | Rails, optimized | [jpcamara/once-campfire, branch `perf`](https://github.com/jpcamara/once-campfire/tree/perf) |
 | Sinatra + Falcon | [jpcamara/once-campfire-sinatra](https://github.com/jpcamara/once-campfire-sinatra) |
 | Rage + Sequel | this repo |
+| Roda + Sequel (Falcon) | [jpcamara/once-campfire-roda](https://github.com/jpcamara/once-campfire-roda) |
 
 ## Design
 
