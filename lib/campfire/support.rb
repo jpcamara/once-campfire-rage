@@ -149,22 +149,16 @@ module Campfire
 
     module_function
 
-    # A text message's body, plain text and creator come from the request that posted it; otherwise
-    # they're loaded.
-    def deliver_for_message(_runtime, room_id, message_id, body = nil, plain = nil, creator_id = nil)
+    def deliver_for_message(_runtime, room_id, message_id)
       runtime = Jobs.runtime
       repo = runtime.repo
       room = repo.room(room_id) or return
-      if creator_id
-        creator = repo.user(creator_id)
-      else
-        row = runtime.db.row("SELECT #{Message.columns} FROM messages WHERE id = ?", message_id) or return
-        message = Message.new(*row)
-        creator = repo.user(message.creator_id)
-        body = repo.bodies([ message.id ])[message.id]
-        attachment = repo.message_attachments([ message.id ])[message.id]
-        plain = Messages.plain_text_body(Context.new(runtime), body, attachment)
-      end
+      row = runtime.db.row("SELECT #{Message.columns} FROM messages WHERE id = ?", message_id) or return
+      message = Message.new(*row)
+      creator = repo.user(message.creator_id)
+      body = repo.bodies([ message.id ])[message.id]
+      attachment = repo.message_attachments([ message.id ])[message.id]
+      plain = Messages.plain_text_body(Context.new(runtime), body, attachment)
       payload =
         if room.direct?
           { title: creator.name, body: plain, path: "/rooms/#{room.id}" }

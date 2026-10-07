@@ -69,34 +69,9 @@ module Campfire
       (match = plain.match(/\A\/play (?<name>\w+)\z/)) && Sound.find_by_name(match[:name])
     end
 
-    Created = Data.define(:message, :body, :plain, :blob)
-
-    def create(...) = create_with_details(...).message
-
-    # A new message and its view. A text message's view is built from what the request already holds;
-    # an attachment's blob gains metadata as it's processed, so that view is loaded. With
-    # CAMPFIRE_CHECK_CACHES=1 the built view is rendered against a loaded one and a mismatch logged.
-    def post(ctx, room:, creator:, params:)
-      created = create_with_details(ctx, room: room, creator: creator, params: params)
-      message = created.message
-      return [ created, views(ctx, [ message ]).first ] if created.blob
-
-      plain = created.plain.strip.empty? ? "" : created.plain
-      view = Repo::MessageView.new(message: message, creator: creator, room: room,
-        presentation: presentation(ctx, created.body, nil, plain), attachment: nil, boosts: [], emoji: ctx.runtime.all_emoji?(plain))
-      check_view(ctx, view) if ENV["CAMPFIRE_CHECK_CACHES"]
-      [ created, view ]
-    end
-
-    def check_view(ctx, view)
-      loaded = views(ctx, [ view.message ], cached: false).first
-      built, fresh = ctx.build_view.render_message(view), ctx.build_view.render_message(loaded)
-      warn "CACHE MISMATCH new message view #{view.message.id}" unless built == fresh
-    end
-
     # MessagesController#create's Message.create!: the message, its rich text body, the room touch,
     # the search index row and the unread flags, in one transaction.
-    def create_with_details(ctx, room:, creator:, params:)
+    def create(ctx, room:, creator:, params:)
       client_message_id = params["client_message_id"].to_s
       client_message_id = SecureRandom.uuid if client_message_id.empty?
       body = canonical_body(params["body"])
@@ -127,7 +102,7 @@ module Campfire
         Message.new(id, client_message_id, created_at, creator.id, room.id, updated_at)
       end
       Uploads.process(ctx, blob) if blob
-      Created.new(message, body, plain, blob)
+      message
     end
 
     # What ActionText::RichText stores: the canonicalized fragment's HTML.
@@ -180,8 +155,7 @@ module Campfire
     end
 
     # After commit: the room broadcast, unread notifications, push notifications and bot webhooks.
-    # `created`, when given, hands the push job the body and plain text it would otherwise reload.
-    def after_create(ctx, room, message, view, webhooks: true, created: nil)
+    def after_create(ctx, room, message, view, webhooks: true)
       html = ctx.build_view.render_message_cached(view)
       stream = "#{RailsCompat.gid_param(room.type, room.id)}:messages"
       Broadcasts.turbo_stream(stream, %(<turbo-stream action="append" target="messages_#{room.param_key}_#{room.id}"><template>#{html}</template></turbo-stream>))
@@ -190,12 +164,7 @@ module Campfire
       payload = %({"roomId":#{room.id}})
       member_ids.each { Broadcasts.raw("user_#{it}_unreads", payload) }
 
-      if created && !created.blob
-        plain = created.plain.strip.empty? ? "" : created.plain
-        Jobs.later(Push, :deliver_for_message, nil, room.id, message.id, created.body, plain, view.creator.id)
-      else
-        Jobs.later(Push, :deliver_for_message, nil, room.id, message.id)
-      end
+      Jobs.later(Push, :deliver_for_message, nil, room.id, message.id)
       Webhooks.deliver_later(ctx.runtime, room, message) if webhooks
     end
   end
