@@ -9,6 +9,7 @@ require "redis-client"
 
 require_relative "campfire/rails_compat"
 require_relative "campfire/ssl"
+require_relative "campfire/cable_gate"
 require_relative "campfire/time_format"
 require_relative "campfire/db"
 require_relative "campfire/models"

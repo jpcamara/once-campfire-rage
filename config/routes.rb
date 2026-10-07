@@ -120,7 +120,7 @@ Rage.routes.draw do
   get "/rails/active_storage/representations/redirect/:signed_blob_id/:variation_key/*", to: "active_storage#representation"
   get "/rails/active_storage/disk/:encoded_key/*", to: "active_storage#disk"
 
-  mount Rage.cable.application, at: "/cable"
+  mount Campfire::CableGate.new(Rage.cable.application), at: "/cable"
 
   # Everything else: the public 404 page.
   match "/*", to: "errors#not_found", via: :all
