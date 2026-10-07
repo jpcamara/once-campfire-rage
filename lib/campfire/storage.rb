@@ -50,6 +50,22 @@ module Campfire
       "/rails/active_storage/representations/redirect/#{signed_blob_id(runtime, blob.id)}/#{variation_key(runtime, transformations)}/#{escape_filename(blob.filename)}"
     end
 
+    # ActiveStorage::Blob::Servable, with Active Storage's default type lists (as the Rust port's
+    # crates/storage/src/content_types.rs): types a browser would run as a page are served as
+    # binary, and anything not allowed inline is an attachment.
+    SERVE_AS_BINARY = %w[ text/html image/svg+xml application/postscript application/x-shockwave-flash text/xml
+      application/xml application/xhtml+xml application/mathml+xml text/cache-manifest ].freeze
+    ALLOWED_INLINE = %w[ image/webp image/avif image/png image/gif image/jpeg image/tiff image/bmp
+      image/vnd.adobe.photoshop image/vnd.microsoft.icon application/pdf ].freeze
+
+    def content_type_for_serving(content_type)
+      SERVE_AS_BINARY.include?(content_type) ? "application/octet-stream" : content_type
+    end
+
+    def forced_disposition_for_serving(content_type)
+      "attachment" if SERVE_AS_BINARY.include?(content_type) || !ALLOWED_INLINE.include?(content_type)
+    end
+
     def disk_path(runtime, key:, filename:, content_type:, disposition:)
       payload = { "key" => key, "disposition" => disposition, "content_type" => content_type, "service_name" => "local" }
       encoded = verifier(runtime).generate(payload, purpose: "blob_key", expires_at: Time.now + 300)

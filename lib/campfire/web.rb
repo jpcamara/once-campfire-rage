@@ -340,9 +340,10 @@ module Campfire
     # ActiveStorage::Blobs::RedirectController and Representations::RedirectController
     def redirect_to_disk(blob, disposition)
       without_version_headers
-      disposition = disposition == "attachment" ? "attachment" : "inline"
+      disposition = Storage.forced_disposition_for_serving(blob.content_type) || (disposition == "attachment" ? "attachment" : "inline")
       headers "cache-control" => "max-age=300, private"
-      redirect url_for(Storage.disk_path(runtime, key: blob.key, filename: blob.filename, content_type: blob.content_type,
+      redirect url_for(Storage.disk_path(runtime, key: blob.key, filename: blob.filename,
+        content_type: Storage.content_type_for_serving(blob.content_type),
         disposition: Storage.content_disposition(disposition, blob.filename)))
     end
 
