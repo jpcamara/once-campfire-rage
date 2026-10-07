@@ -487,16 +487,30 @@ module Campfire
   module Bans
     module_function
 
+    # False, with nothing changed, when a session's address can't be banned: bans.create! raises
+    # RecordInvalid inside the ban's transaction, which rolls it back.
     def ban(ctx, user)
       now = TimeFormat.now_text
-      ctx.db.transaction do |w|
+      banned = ctx.db.transaction do |w|
         ips = w.rows("SELECT DISTINCT ip_address FROM sessions WHERE user_id = ? AND ip_address IS NOT NULL AND ip_address != ''", user.id).map(&:first)
+        next false unless ips.all? { bannable_ip?(it) }
         ips.each { w.run("INSERT INTO bans (created_at, ip_address, updated_at, user_id) VALUES (?, ?, ?, ?)", now, it, now, user.id) }
         w.run("DELETE FROM sessions WHERE user_id = ?", user.id)
         w.run("UPDATE users SET status = 2, updated_at = ? WHERE id = ?", now, user.id)
+        true
       end
+      return false unless banned
       Broadcasts.disconnect_user(user.id)
       Jobs.later(Bans, :remove_banned_content, user.id)
+      true
+    end
+
+    # Ban#ip_address_is_public
+    def bannable_ip?(ip)
+      address = IPAddr.new(ip)
+      !(address.loopback? || address.private? || address.link_local?)
+    rescue IPAddr::InvalidAddressError
+      false
     end
 
     def unban(ctx, user)

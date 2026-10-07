@@ -5,7 +5,7 @@ class BansController < ApplicationController
     verify_same_origin!
     head_response(403) unless current_user.can_administer?
     user = repo.user(id) or record_not_found!
-    Bans.ban(self, user)
+    Bans.ban(self, user) or unprocessable_entity! # ActiveRecord::RecordInvalid
     redirect url_for("/users/#{user.id}")
   end
 

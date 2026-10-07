@@ -459,10 +459,10 @@ module Campfire
         when nil then request.scheme != "https" && !SSL.enabled?
         else false
         end
-      invalid_authenticity_token! unless valid_origin && valid_site
+      unprocessable_entity! unless valid_origin && valid_site # ActionController::InvalidAuthenticityToken
     end
 
-    def invalid_authenticity_token!
+    def unprocessable_entity!
       without_security_headers
       without_version_headers
       halt 422, { "content-type" => "text/html; charset=UTF-8" }, Campfire.file_io { File.read(File.join(ROOT, "public/422.html")) }
