@@ -68,8 +68,9 @@ module Campfire
       app.account_logo_attached?
     end
 
+    # The fresh_account_logo route: no version before first run, when there's no account.
     def account_logo_path
-      "/account/logo?v=#{TimeFormat.number(account.updated_at)}"
+      account ? "/account/logo?v=#{TimeFormat.number(account.updated_at)}" : "/account/logo"
     end
 
     def account_logo_tag(style: nil)

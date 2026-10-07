@@ -22,8 +22,9 @@ module Campfire
       @repo.account
     end
 
+    # Current.account&.logo&.attached?: there's no account before first run.
     def account_logo_attached?
-      !@repo.attachment_blob("Account", account.id, "logo").nil?
+      (account = self.account) && !@repo.attachment_blob("Account", account.id, "logo").nil?
     end
 
     def avatar_token(user_id)
