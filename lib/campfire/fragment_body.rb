@@ -69,6 +69,8 @@ module Campfire
   class FragmentBody
     MARKER = /\u0001(\d+)\u0002/
 
+    def self.marker(index) = "\u0001#{index}\u0002"
+
     def self.deflate_block(string)
       deflater = Zlib::Deflate.new(Zlib::DEFAULT_COMPRESSION, -Zlib::MAX_WBITS)
       block = deflater.deflate(string, Zlib::SYNC_FLUSH)

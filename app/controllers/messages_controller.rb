@@ -1,6 +1,9 @@
 class MessagesController < ApplicationController
   # Finished pages of messages by their ETag (which covers the messages' versions, the user, the
-  # host and the user agent), the Accept header and the encoding, with their Last-Modified.
+  # host and the user agent), the Accept header and the encoding, with their Last-Modified. The
+  # Elixir port's messages.ex keeps these pages' parts and gzip per ETag the same way: the page is
+  # only message fragments, so equal ETags mean equal pages. The messages are still read, and the
+  # ETag computed, on every request.
   KEPT = {}
   KEPT_LIMIT = 512
   Kept = Data.define(:body, :last_modified)

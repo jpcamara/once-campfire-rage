@@ -75,45 +75,58 @@ module Campfire
     def render_room(room, messages)
       invitation = room.id == repo.original_room_id && repo.room_message_count(room.id) <= Repo::PAGE_SIZE
       account = runtime.account
-      page_etag("room", room, account.updated_at, account.name, invitation, messages.map { "#{it.id}-#{it.updated_at}" },
-        (repo.direct_room_member_names(room.id, current_user.id) if room.direct?), flash_now)
-      kept_response { fragment_page { render_room_page(room, messages, invitation) } }
-    end
-
-    # Finished pages (body, gzipped or not, and the headers rendering sets) by the read cache's
-    # generation, which changes with anything the page reads from the database, and the page's
-    # ETag, which covers the request's inputs: user, host, user agent and flash. With
-    # CAMPFIRE_CHECK_CACHES=1 a hit is rendered again and compared, and a mismatch logged.
-    KEPT_RESPONSES = {}
-    KEPT_RESPONSES_LIMIT = 512
-    KEPT_HEADERS = %w[ cache-control content-type vary link ].freeze
-    CHECK_CACHES = ENV["CAMPFIRE_CHECK_CACHES"]
-    KeptResponse = Data.define(:body, :headers)
-
-    def kept_response(&render)
-      gzip = env["HTTP_ACCEPT_ENCODING"].to_s.include?("gzip") && env["REQUEST_METHOD"] == "GET"
-      key = [ db.generation, headers["etag"], flash_now, env["HTTP_TURBO_FRAME"], env["HTTP_ACCEPT"], gzip ]
-      if (kept = KEPT_RESPONSES.delete(key))
-        KEPT_RESPONSES[key] = kept
-        headers kept.headers
-        check_kept_response(kept, gzip, &render) if CHECK_CACHES
-      else
-        page = yield
-        page = FragmentBody.new(page) unless page.is_a?(FragmentBody)
-        kept = KEPT_RESPONSES[key] = KeptResponse.new((gzip ? page.gzip : page.to_s).freeze, headers.slice(*KEPT_HEADERS).to_h)
-        KEPT_RESPONSES.delete(KEPT_RESPONSES.first[0]) while KEPT_RESPONSES.size > KEPT_RESPONSES_LIMIT
+      direct_names = (repo.direct_room_member_names(room.id, current_user.id) if room.direct?)
+      message_keys = messages.map { "#{it.id}-#{it.updated_at}" }
+      page_etag("room", room, account.updated_at, account.name, invitation, message_keys, direct_names, flash_now)
+      views = message_views(messages)
+      shell_page([ :room, room, invitation, direct_names, runtime.account_logo_attached?, message_keys ], views) do
+        render_room_page(room, views, invitation)
       end
-      headers "content-length" => kept.body.bytesize.to_s
-      headers "content-encoding" => "gzip" if gzip
-      kept.body
     end
 
-    def check_kept_response(kept, gzip)
-      page = yield
-      page = FragmentBody.new(page) unless page.is_a?(FragmentBody)
-      fresh = page.to_s.b
-      stored = gzip ? Zlib.gunzip(kept.body) : kept.body.b
-      warn "CACHE MISMATCH #{request.path_info} (#{stored.bytesize} kept vs #{fresh.bytesize} fresh bytes)" unless stored == fresh
+    # The page around its messages, memoized by a digest of everything its templates read, as the
+    # Elixir port's room_page.ex and searches.ex do: the user, the account (name, logo, custom
+    # styles, join code), the host, the user agent (platform-specific markup), the frame and Accept
+    # headers, the flash, and the inputs the action passes. The messages are spliced in from their
+    # cached fragments on every request, so a page is assembled for each request; nothing keeps a
+    # finished response. With CAMPFIRE_CHECK_CACHES=1 a hit renders again and logs any mismatch.
+    SHELLS = {}
+    SHELLS_LIMIT = 512
+    SHELL_HEADERS = %w[ cache-control content-type vary link ].freeze
+    CHECK_CACHES = ENV["CAMPFIRE_CHECK_CACHES"]
+    Shell = Data.define(:html, :headers)
+
+    def shell_page(inputs, views, &render)
+      key = Digest::SHA256.digest(Marshal.dump([ inputs, current_user, runtime.account, base_url, request.user_agent,
+        env["HTTP_TURBO_FRAME"], env["HTTP_ACCEPT"], flash_now ]))
+      fragment_view = build_view
+      fragments = views.map { fragment_view.message_fragment(it) }
+      if (shell = SHELLS.delete(key))
+        SHELLS[key] = shell
+        headers shell.headers
+        check_shell(shell, &render) if CHECK_CACHES
+      else
+        html = collecting_fragments(&render)
+        shell = Shell.new(html.freeze, headers.slice(*SHELL_HEADERS).to_h.freeze)
+        SHELLS[key] = shell unless flash_now.any?
+        SHELLS.delete(SHELLS.first[0]) while SHELLS.size > SHELLS_LIMIT
+      end
+      body = FragmentBody.from(shell.html, fragments)
+      headers "Content-Length" => body.bytesize.to_s
+      body
+    end
+
+    def check_shell(shell, &render)
+      fresh = collecting_fragments(&render)
+      warn "CACHE MISMATCH #{request.path_info} (shell #{shell.html.bytesize} kept vs #{fresh.bytesize} fresh bytes)" unless fresh == shell.html
+    end
+
+    def collecting_fragments
+      @collect_fragments = true
+      yield
+    ensure
+      @collect_fragments = false
+      @fragment_view = nil
     end
 
     # A page whose message fragments go out as a FragmentBody (cached gzip blocks).
@@ -128,8 +141,7 @@ module Campfire
       @collect_fragments = false
     end
 
-    def render_room_page(room, messages, invitation)
-      views = message_views(messages)
+    def render_room_page(room, views, invitation)
       view = build_view(room: room, messages: views, invitation: invitation)
       render_layout(view,
         page_title: view.room_display_name(room), body_class: "sidebar",
@@ -218,13 +230,16 @@ module Campfire
       recent = repo.recent_search_queries(current_user.id)
       return_to_room = last_room_visited
       account = runtime.account
-      page_etag("search", raw_query, account.updated_at, recent, return_to_room.id, messages.map { "#{it.id}-#{it.updated_at}" })
-      kept_response { fragment_page { render_search_page(query, raw_query, messages, recent, return_to_room) } }
+      message_keys = messages.map { "#{it.id}-#{it.updated_at}" }
+      page_etag("search", raw_query, account.updated_at, recent, return_to_room.id, message_keys)
+      views = message_views(messages)
+      shell_page([ :search, query, raw_query, recent, return_to_room, runtime.account_logo_attached?, message_keys ], views) do
+        render_search_page(query, raw_query, views, recent, return_to_room)
+      end
     end
 
-    def render_search_page(query, raw_query, messages, recent, return_to_room)
-      views = message_views(messages)
-      view = build_view(query: query, raw_query: raw_query, count: messages.size, messages: views, recent_searches: recent,
+    def render_search_page(query, raw_query, views, recent, return_to_room)
+      view = build_view(query: query, raw_query: raw_query, count: views.size, messages: views, recent_searches: recent,
         return_to_room: return_to_room)
       view.with(recents: view.tpl_searches_recents)
       render_layout(view, page_title: "Search", body_class: "sidebar searches",

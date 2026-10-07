@@ -1,7 +1,8 @@
 class SidebarsController < ApplicationController
-  # Finished sidebars by everything they're rendered from: the database (the read cache's
-  # generation), the user, and the request's host, user agent, frame and Accept. A sidebar with a
-  # flash isn't kept.
+  # Finished sidebars, kept until the database changes, as the Elixir port's sidebar.ex keeps its
+  # HTML until one of the tables it reads is written. The key is everything else it's rendered
+  # from: the read cache's generation (any write), the user, and the request's host, user agent,
+  # frame and Accept. A sidebar with a flash isn't kept.
   KEPT = {}
   KEPT_LIMIT = 1024
   Kept = Data.define(:body, :digest)
