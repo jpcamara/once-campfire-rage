@@ -30,20 +30,38 @@ Sinatra repo.
 
 ## Performance
 
-Requests/sec with 16 clients, four hardware threads per app, on a Hetzner Ryzen 7 PRO 8700GE.
-The harness is DHH's `bench/run`. YJIT and jemalloc are on. These are the latest A/B numbers; a
-final run of all three apps together will replace them.
+Final run, Oct 7 2026: DHH's `bench/run` on a Hetzner Ryzen 7 PRO 8700GE. Each app gets four
+hardware threads and the load generator four others. YJIT and jemalloc are on. The numbers are
+medians of 3 runs in rotating order, measured alongside the other implementations and stock
+Rails, with 0 errors.
 
-| HTTP workload (requests/sec) | Rails (stock) | Rage |
+| Workload | Rails (stock) | Rage |
 |---|---:|---:|
-| Room page | 223 | 10,086 |
-| Messages page | 371 | 24,347 |
-| Sidebar | 475 | 33,190 |
-| Search | 377 | 16,966 |
-| Post a message | 199 | 1,836 |
+| Room page (req/s, 16 clients) | 225 | 10,127 |
+| Messages page | 364 | 24,569 |
+| Sidebar | 482 | 34,134 |
+| Search | 378 | 16,837 |
+| Post a message | 198 | 1,848 |
+| Avatar | 62,491 | 165,748 |
+| Action Cable, 1,000 clients: p50 delivery | 42.8 ms | 5.0 ms |
+| Action Cable, 1,000 clients: saturated | 13 msg/s | 194 msg/s |
+| Upload + thumbnail (505 KB) | 67 ms | 134 ms |
+| Idle memory (anon) | 284 MB | 170 MB |
+| Cold start | 3.6 s | 1.6 s |
 
-Action Cable fan-out at 1,000 clients had a p50 delivery of 4.9 ms at 192 messages/sec, with every
-message delivered.
+Uploads are about 2× slower than in Rails (134 ms vs 67 ms). It's not fixed yet.
+
+**Room-page reads while posts arrive** (reads/sec at 16 clients, the median of 3 reps, each on a
+fresh seed). The read routes above never see a write, so this shows what the caches do under real
+traffic:
+
+| Posts/sec in the background | 0 | 20 | 100 |
+|---|---:|---:|---:|
+| Rails (stock) | 228 | 214 | 194 |
+| Rage | 10,074 | 9,309 | 6,697 |
+
+The per-change table below comes from the A/B run for each step. Each step was measured against
+the commit just before it, so the percentages don't multiply exactly into the totals.
 
 **Where the gains come from.** Each change was measured with an A/B against the commit before it.
 
