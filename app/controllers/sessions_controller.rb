@@ -23,6 +23,10 @@ class SessionsController < ApplicationController
   action :destroy do
     require_authentication!
     verify_same_origin!
+    # SessionsController#remove_push_subscription: this device stops getting the user's notifications.
+    if (endpoint = params["push_subscription_endpoint"])
+      db.transaction { |w| w.run("DELETE FROM push_subscriptions WHERE endpoint = ? AND user_id = ?", endpoint.to_s, current_user.id) }
+    end
     db.transaction { |w| w.run("DELETE FROM sessions WHERE id = ?", @session.id) }
     Broadcasts.disconnect_user(current_user.id, reconnect: true) # Authentication#disconnect_remote_connections
     response.delete_cookie("session_token", path: "/")
