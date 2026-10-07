@@ -7,6 +7,16 @@ require "net/http"
 require "tempfile"
 require "redis-client"
 
+module Campfire
+  # CAMPFIRE_CACHING=rust keeps only the caches the Rust port has: message fragments, their
+  # compressed pieces and whole-body gzip, the public-response cache, prepared statements and
+  # static assets. It turns off the ones only the Elixir port (or this app) has: the read cache,
+  # kept sidebars, kept room and search shells, kept messages pages, and memoized avatar tokens,
+  # signed blob ids, signed stream names and initials. It's for measuring how much those are worth.
+  RUST_CACHING_ONLY = ENV["CAMPFIRE_CACHING"] == "rust"
+  def self.rust_caching_only? = RUST_CACHING_ONLY
+end
+
 require_relative "campfire/rails_compat"
 require_relative "campfire/ssl"
 require_relative "campfire/cable_gate"

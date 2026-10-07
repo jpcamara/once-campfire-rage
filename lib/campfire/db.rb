@@ -129,6 +129,7 @@ module Campfire
       end
 
       def fetch(sql, binds)
+        return yield.each(&:freeze).freeze if Campfire.rust_caching_only?
         refresh unless @checked.equal?(Fiber.current)
         key = [ sql, *binds ]
         if (rows = @entries.delete(key))

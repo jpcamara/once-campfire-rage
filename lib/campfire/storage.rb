@@ -25,6 +25,7 @@ module Campfire
 
     # ActiveStorage::Blob#signed_id: {"_rails":{"data":id,"pur":"blob_id"}}
     def signed_blob_id(runtime, blob_id)
+      return verifier(runtime).generate(blob_id, purpose: "blob_id") if Campfire.rust_caching_only?
       (@signed_blob_ids ||= {})[blob_id] ||= verifier(runtime).generate(blob_id, purpose: "blob_id")
     end
 

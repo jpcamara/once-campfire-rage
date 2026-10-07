@@ -105,14 +105,14 @@ module Campfire
         env["HTTP_TURBO_FRAME"], env["HTTP_ACCEPT"], flash_now ]))
       fragment_view = build_view
       fragments = views.map { fragment_view.message_fragment(it) }
-      if (shell = SHELLS.delete(key))
+      if !Campfire.rust_caching_only? && (shell = SHELLS.delete(key))
         SHELLS[key] = shell
         headers shell.headers
         check_shell(shell, &render) if CHECK_CACHES
       else
         html = collecting_fragments(&render)
         shell = Shell.new(html.freeze, headers.slice(*SHELL_HEADERS).to_h.freeze)
-        SHELLS[key] = shell unless flash_now.any?
+        SHELLS[key] = shell unless flash_now.any? || Campfire.rust_caching_only?
         SHELLS.delete(SHELLS.first[0]) while SHELLS.size > SHELLS_LIMIT
       end
       body = FragmentBody.from(shell.html, fragments)

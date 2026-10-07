@@ -12,6 +12,7 @@ class SidebarsController < ApplicationController
   action :show do
     require_authentication!
     html_headers
+    return render_sidebar if Campfire.rust_caching_only?
     key = [ db.generation, current_user, base_url, request.user_agent, env["HTTP_TURBO_FRAME"], env["HTTP_ACCEPT"] ]
     if flash_now.empty? && (kept = KEPT.delete(key))
       KEPT[key] = kept

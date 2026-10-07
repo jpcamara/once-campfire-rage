@@ -34,15 +34,18 @@ class MessagesController < ApplicationController
     flash_now # read (and so consumed) on every render
     gzip = env["HTTP_ACCEPT_ENCODING"].to_s.include?("gzip") && env["REQUEST_METHOD"] == "GET"
     key = [ headers["etag"], env["HTTP_ACCEPT"], gzip ]
-    if (kept = KEPT.delete(key))
+    if !Campfire.rust_caching_only? && (kept = KEPT.delete(key))
       KEPT[key] = kept
     else
       # fresh_when @messages: the newest updated_at is the Last-Modified.
       last_modified = messages.map { TimeFormat.parse(it.updated_at) }.max.httpdate
       page = messages_html(messages)
       page = FragmentBody.new(page) unless page.is_a?(FragmentBody)
-      kept = KEPT[key] = Kept.new((gzip ? page.gzip : page.to_s).freeze, last_modified)
-      KEPT.delete(KEPT.first[0]) while KEPT.size > KEPT_LIMIT
+      kept = Kept.new((gzip ? page.gzip : page.to_s).freeze, last_modified)
+      unless Campfire.rust_caching_only?
+        KEPT[key] = kept
+        KEPT.delete(KEPT.first[0]) while KEPT.size > KEPT_LIMIT
+      end
     end
     headers "last-modified" => kept.last_modified, "content-length" => kept.body.bytesize.to_s
     headers "content-encoding" => "gzip" if gzip

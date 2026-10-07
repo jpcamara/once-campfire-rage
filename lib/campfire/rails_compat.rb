@@ -181,6 +181,7 @@ module Campfire
       end
 
       def signed_stream_name(name)
+        return @turbo_streams.generate(name).freeze if Campfire.rust_caching_only?
         @stream_names[name] ||= @turbo_streams.generate(name).freeze
       end
 

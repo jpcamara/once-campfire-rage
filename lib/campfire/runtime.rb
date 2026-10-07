@@ -28,6 +28,7 @@ module Campfire
     end
 
     def avatar_token(user_id)
+      return @secrets.signed_id(user_id, "user/avatar").freeze if Campfire.rust_caching_only?
       @avatar_tokens[user_id] ||= @secrets.signed_id(user_id, "user/avatar").freeze
     end
 

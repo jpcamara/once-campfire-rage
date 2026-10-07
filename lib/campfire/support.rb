@@ -53,6 +53,7 @@ module Campfire
 
     # Users::AvatarsController#render_initials, kept per user version.
     def initials_svg(user)
+      @initials = {} if Campfire.rust_caching_only?
       (@initials ||= {})[[ user.id, user.name ]] ||= begin
         initials = user.initials
         length = initials.size >= 3 ? 'textLength="85%" lengthAdjust="spacingAndGlyphs"' : ""
