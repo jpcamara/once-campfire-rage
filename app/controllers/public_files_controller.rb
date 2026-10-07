@@ -2,6 +2,7 @@
 class PublicFilesController < ApplicationController
   action :show do
     path = File.join(Campfire::ROOT, "public", request.path_info)
+    env[Campfire::RequestId::STATIC] = true
     without_security_headers
     without_version_headers
     headers "cache-control" => "public, max-age=2592000", "last-modified" => File.mtime(path).httpdate,

@@ -13,7 +13,7 @@ Rage.configure do
 
   # The real clock's Date under the parity harness's faked one, assume_ssl and force_ssl (unless
   # DISABLE_SSL), the forms' method override, Thruster's response cache and gzip, Rails' Rack::ETag,
-  # digested assets from memory.
+  # digested assets from memory, and X-Request-Id for everything the app answers.
   config.middleware.use Campfire::RealDate if Campfire::RealDate.wrap?
   if Campfire::SSL.enabled?
     config.middleware.use Campfire::SSL::Assume
@@ -24,6 +24,7 @@ Rage.configure do
   config.middleware.use Campfire::Compression
   config.middleware.use Campfire::ETag
   config.middleware.use Campfire::AssetFiles
+  config.middleware.use Campfire::RequestId
 end
 
 require "rage/setup"
