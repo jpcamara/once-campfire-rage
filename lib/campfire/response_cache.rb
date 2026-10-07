@@ -9,13 +9,14 @@ module Campfire
     CAPACITY = 64 * 1024 * 1024
     MAX_ITEM = 1024 * 1024
     MAX_URI = 2048
+    VARY_LIMIT = 4096
     BODILESS_HEADERS = %w[ content-type content-length ].freeze
 
     Entry = Data.define(:status, :headers, :body, :expires_at, :size)
 
     def initialize(app)
       @app = app
-      @vary = {}    # key without variant => the response's Vary names
+      @vary = {}    # key without variant => the response's Vary names, least recently stored first
       @entries = {} # full key => Entry, least recently used first
       @size = 0
     end
@@ -31,6 +32,11 @@ module Campfire
       status, headers, body = @app.call(env)
       if (lifetime = lifetime(status, headers))
         headers.delete("set-cookie")
+        # A body too big to keep (or of unknown size, and not already in memory) goes on as it is,
+        # without being read into memory first.
+        size = headers["content-length"]&.to_i || (body.sum(&:bytesize) if body.is_a?(Array))
+        return [ status, headers, body ] unless size && size <= MAX_ITEM
+
         content = +""
         body.each { content << it }
         body.close if body.respond_to?(:close)
@@ -76,7 +82,9 @@ module Campfire
         size = content.bytesize + key.bytesize + kept.sum { |name, value| name.bytesize + value.to_s.bytesize }
         return if size > MAX_ITEM
 
+        @vary.delete(base)
         @vary[base] = names
+        @vary.delete(@vary.first[0]) while @vary.size > VARY_LIMIT # a forgotten Vary is only a miss
         if (previous = @entries.delete(key))
           @size -= previous.size
         end
