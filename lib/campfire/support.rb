@@ -572,14 +572,16 @@ module Campfire
   module Boosts
     module_function
 
+    # The full content, as Rails stores it: SQLite doesn't enforce the column's limit: 16, and the
+    # Boost model doesn't validate it.
     def create(ctx, message, content)
       now = TimeFormat.now_text
       boost = ctx.db.transaction do |w|
         w.run("INSERT INTO boosts (booster_id, content, created_at, message_id, updated_at) VALUES (?, ?, ?, ?, ?)",
-          ctx.current_user.id, content[0, 16], now, message.id, now)
+          ctx.current_user.id, content, now, message.id, now)
         id = w.last_insert_row_id
         w.run("UPDATE messages SET updated_at = ? WHERE id = ?", now, message.id)
-        Boost.new(id, ctx.current_user.id, content[0, 16], now, message.id, now)
+        Boost.new(id, ctx.current_user.id, content, now, message.id, now)
       end
       room = ctx.repo.room(message.room_id)
       html = ctx.build_view.render_boost(boost, ctx.current_user)
