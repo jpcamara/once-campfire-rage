@@ -1,10 +1,14 @@
 module Campfire
   # Helpers shared by the room, message, sidebar and search actions.
   module Pages
-    # Authentication's restore_authentication || bot_authentication, then the user's room
+    # Authentication's restore_authentication || bot_authentication, then the user's room. A request
+    # signed in by its session cookie is checked for forgery like any other write; only one
+    # authenticated by its bot key skips the check (protect_from_forgery ... unless:
+    # authenticated_by.bot_key?).
     def bot_room!(bot_key, room_id)
-      bot = restore_authentication
-      unless bot
+      if (bot = restore_authentication)
+        verify_same_origin! unless request.get? || request.head?
+      else
         id, token = bot_key.strip.split("-", 2)
         row = db.row("SELECT #{User.columns} FROM users WHERE id = ? AND bot_token = ? AND status = 0 AND role = 2 LIMIT 1", id.to_i, token.to_s)
         halt 302, { "Location" => url_for("/session/new") }, "" unless row
