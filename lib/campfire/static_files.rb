@@ -14,8 +14,7 @@ module Campfire
     end
 
     def call(env)
-      path = Rack::Utils.unescape_path(env["PATH_INFO"])
-      entry = @entries[path] ||= Campfire.file_io { load(path) }
+      entry = entry_for(File.expand_path(File.join(@root, Rack::Utils.unescape_path(env["PATH_INFO"]))))
       return [ 404, { "content-type" => "text/plain" }, [ "Not found" ] ] unless entry
 
       headers = { "cache-control" => @cache_control, "content-type" => entry.type, "last-modified" => entry.last_modified }
@@ -32,6 +31,13 @@ module Campfire
     end
 
     private
+      # Kept by the file's own path, so other spellings of it (//, /./, a/../) share one copy, and
+      # only files that exist are kept.
+      def entry_for(file)
+        return nil unless file.start_with?("#{@root}/")
+        @entries[file] || (entry = Campfire.file_io { load(file) }) && (@entries[file] = entry)
+      end
+
       # Rack::Files' single byte ranges: 206 with the slice, uncompressed, and the Vary that Thruster
       # then adds a second Accept-Encoding to; 416 when nothing of the range is in the file.
       def partial(env, headers, body)
@@ -47,9 +53,8 @@ module Campfire
         [ 206, headers, env["REQUEST_METHOD"] == "HEAD" ? [] : [ slice ] ]
       end
 
-      def load(path)
-        file = File.expand_path(File.join(@root, path))
-        return nil unless file.start_with?("#{@root}/") && File.file?(file)
+      def load(file)
+        return nil unless File.file?(file)
         body = File.binread(file).freeze
         type = Rack::Mime.mime_type(File.extname(file), "application/octet-stream")
         # Thruster compresses everything, so every file gets a gzip copy (made once).
