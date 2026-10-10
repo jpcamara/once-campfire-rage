@@ -14,7 +14,7 @@ Sinatra repo.
 
 | Implementation | Code |
 |---|---|
-| Rails, optimized | [jpcamara/once-campfire, branch `perf`](https://github.com/jpcamara/once-campfire/tree/perf) |
+| Rails, optimized (retired Oct 10; use [upstream](https://github.com/basecamp/once-campfire)) | [jpcamara/once-campfire, branch `perf`](https://github.com/jpcamara/once-campfire/tree/perf) |
 | Sinatra + Falcon | [jpcamara/once-campfire-sinatra](https://github.com/jpcamara/once-campfire-sinatra) |
 | Rage + Sequel | this repo |
 | Roda + Sequel (Falcon) | [jpcamara/once-campfire-roda](https://github.com/jpcamara/once-campfire-roda) |
