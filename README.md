@@ -68,6 +68,60 @@ traffic:
 The per-change table below comes from the A/B run for each step. Each step was measured against
 the commit just before it, so the percentages don't multiply exactly into the totals.
 
+## Finished-page cache (Oct 10)
+
+Upstream Rails now keeps finished private pages until the database changes
+([ac73267](https://github.com/basecamp/once-campfire/commit/ac73267),
+[0f5d0b2](https://github.com/basecamp/once-campfire/commit/0f5d0b2),
+[8d02540](https://github.com/basecamp/once-campfire/commit/8d02540)), following the C port. The Rust
+port added the same thing
+([d09811c](https://github.com/basecamp/once-campfire-rust/commit/d09811c),
+`crates/campfire/src/response_cache.rs`). So this app does it too (`lib/campfire/page_cache.rb`):
+
+- **What's kept:** the room, messages, sidebar and search pages of a signed-in user, body and gzip.
+- **When it's dropped:** any SQLite commit from any process clears it (`PRAGMA data_version`). The
+  version is captured before authentication and checked again at lookup and admission, so a commit
+  during a render can't leave a stale page under the new version. Entries also expire after 15
+  seconds, as Rust's do.
+- **What still runs on every request:** authentication, the room access check and cookies.
+- **Not kept:** pages with a flash, conditional requests, and responses that set a cookie.
+- **Bounds:** `CAMPFIRE_RESPONSE_CACHE_MB` per process (default 64, 0 turns it off), 1 MB per page.
+  Concurrent renders of one page collapse into one.
+- **`CAMPFIRE_CACHING=rust`** keeps this cache on, since the Rust port has it.
+
+**Checks:** every Playwright cell on every seed passes (default 874, crowd 25, custom_styles 33,
+first_run 16, restricted 8). Server HTML matches the reference on 128 of 128 pages, fresh and
+cached. All 24 write flows match. With the cache on and off, 60 requests across these scenarios
+give identical statuses: foreign writes to a message body and to a user's name, a revoked
+membership, a banned user, a deleted session. Every read after a foreign write shows it. Check mode
+(`CAMPFIRE_CHECK_CACHES=1`) found 0 mismatches across reads, posts and foreign writes from all 4
+processes.
+
+Measured with DHH's verification harness
+([basecamp/once-campfire-verification](https://github.com/basecamp/once-campfire-verification)
+`ec02deb`) on the Hetzner box: app on CPUs 4-7, load generator on 0-3, 3 rounds, 8-second samples.
+Upstream Rails `0aa339d` and Rust `6dae2fd` ran in the same session. Every response passed the
+harness's route checks, and every write passed its audit, with 0 errors or invalid responses.
+
+| Requests/sec, 16 clients | Rage before | **Rage with page cache** | Rails (upstream) | Rust |
+|---|---:|---:|---:|---:|
+| Room page | 7,870 | **21,106** | 3,189 | 42,282 |
+| Messages page | 23,400 | **28,381** | 3,206 | 40,615 |
+| Sidebar | 32,880 | **31,245** | 3,568 | 48,314 |
+| Search | 16,311 | **29,798** | 3,450 | 47,564 |
+| Post a message | 2,013 | **1,985** | 282 | 4,792 |
+
+Mixed profile (16 readers plus one writer at 10 posts/sec, read requests/sec):
+
+| Read requests/sec | Rage before | **Rage with page cache** | Rails (upstream) | Rust |
+|---|---:|---:|---:|---:|
+| Room page | 9,810 | **20,501** | 1,545 | 39,564 |
+| Messages page | 23,237 | **28,234** | 1,875 | 37,997 |
+| Sidebar | 31,796 | **29,963** | 2,838 | 46,939 |
+| Search | 16,017 | **29,955** | 2,580 | 46,151 |
+
+"Before" is the same harness earlier on Oct 10, without this cache.
+
 ## Compared with Rust on the same box
 
 DHH's [Rust port](https://github.com/basecamp/once-campfire-rust) (`ccece30`) was built and run on the
@@ -105,9 +159,10 @@ The rule here: only cache what the Rust or Elixir ports cache, checked against t
 | Compressed pieces | Each fragment's deflate block, the text between fragments, and a whole body's gzip by digest | `kit/src/deflater/splice.rs` |
 | Public responses | `Cache-Control: public` responses such as avatars and assets | `kit/src/front/cache.rs` |
 | Prepared statements | 256 per connection | `db` crate |
+| Finished private pages (added Oct 7) | Room, messages, sidebar and search pages, until a commit or 15 s | `campfire/src/response_cache.rs` (d09811c) |
 
-Rust caches no query results and no pages, sidebars or page shells. It renders every page on every
-request.
+Rust caches no query results, sidebars or page shells. Since Oct 7 it keeps finished private pages
+until the next commit, as upstream Rails and the C port do; on a miss it renders the whole page.
 
 **What this app caches**, with each cache's precedent and its effect in a per-step A/B:
 
@@ -118,6 +173,7 @@ request.
 | Whole-body gzip by digest | Rust, Elixir | sidebar +56% |
 | Public responses (avatars, assets) | Rust, Thruster | avatars 8.8× |
 | Prepared statements (Sequel, named) | Rust | room +17%, sidebar +23%, post +24% |
+| Finished private pages until the database changes | Rust (d09811c), upstream Rails (ac73267), C | room 2.7×, search 1.8×, messages 1.2× |
 | Read cache (`PRAGMA data_version`) | Elixir only | +26–47% on every read route |
 | Finished sidebar until its data changes | Elixir only | sidebar 3.4× |
 | Messages page per ETag | Elixir only | messages 1.9× |
