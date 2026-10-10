@@ -95,6 +95,7 @@ module Campfire
     def respond
       @__headers = Rack::Headers.new
       @status = 200
+      @page_cache_version = db.generation # captured before authentication (PageCache)
       result = catch(:halt) do
         apply_default_headers
         yield
@@ -345,6 +346,66 @@ module Campfire
       redirect url_for(Storage.disk_path(runtime, key: blob.key, filename: blob.filename,
         content_type: Storage.content_type_for_serving(blob.content_type),
         disposition: Storage.content_disposition(disposition, blob.filename)))
+    end
+
+    # ---- Finished private pages
+
+    # A finished private page from PageCache, or rendered and kept there. Runs after authentication
+    # and the room check, before the page's own queries, as upstream Rails' cache_read_response
+    # does. Pages with a flash, conditional requests, HEAD and responses that set a cookie or
+    # aren't a 200 text/html page are rendered as usual and not kept. With CAMPFIRE_CHECK_CACHES=1
+    # a hit is rendered again and compared.
+    def cached_page
+      cache = PageCache.instance
+      return yield unless cache.enabled? && request.get? && @session && flash_now.empty? &&
+        !env["HTTP_IF_NONE_MATCH"] && !env["HTTP_IF_MODIFIED_SINCE"]
+
+      version = @page_cache_version
+      gzip = env["HTTP_ACCEPT_ENCODING"].to_s.include?("gzip") # Compression's test
+      key = JSON.generate([ request.path_info, request.query_string, base_url, request.user_agent, gzip,
+        env["HTTP_ACCEPT"], env["HTTP_TURBO_FRAME"], current_user.id, request.cookies.except("_campfire_session").to_a.sort ])
+      return yield if key.bytesize > PageCache::MAX_KEY_BYTES
+
+      entry = cache.read(key, version, db.current_generation)
+      unless entry
+        rendered = nil
+        cache.synchronize_render(key, version) do
+          entry = cache.read(key, version, db.current_generation)
+          if !entry && version == db.current_generation
+            cookies_before = headers["set-cookie"]
+            rendered = yield
+            entry = keep_page(cache, key, version, rendered, gzip) if headers["set-cookie"] == cookies_before
+          end
+        end
+        return rendered if rendered && !entry
+        return yield unless entry # waited behind a render made at a newer version: render this one alone
+      end
+
+      check_kept_page(entry, gzip) { yield } if ENV["CAMPFIRE_CHECK_CACHES"]
+      headers entry.headers
+      headers "content-encoding" => "gzip" if gzip
+      headers "content-length" => entry.body.bytesize.to_s
+      entry.body
+    end
+
+    def keep_page(cache, key, version, rendered, gzip)
+      return unless @status == 200 && headers["content-type"].to_s.start_with?("text/html")
+      encoded = headers["content-encoding"] # MessagesController gzips its own kept pages
+      return if encoded && !(encoded == "gzip" && gzip)
+      html = rendered.is_a?(FragmentBody) ? rendered.to_s : Array(rendered).join
+      return if html.empty?
+      kept = PageCache::KEPT_HEADERS.filter_map { |name| (value = headers[name]) && [ name, value ] }.to_h
+      kept["etag"] ||= %(W/"#{Digest::MD5.hexdigest(encoded ? Zlib.gunzip(html) : html)}") unless kept["last-modified"] # Rack::ETag's, once
+      body = encoded || !gzip ? html : (rendered.is_a?(FragmentBody) ? rendered.gzip : Compression.gzip_string(html))
+      cache.write(key, version, db.current_generation, body, kept)
+    end
+
+    def check_kept_page(entry, gzip)
+      fresh = yield
+      fresh = fresh.is_a?(FragmentBody) ? fresh.to_s : Array(fresh).join
+      fresh = Zlib.gunzip(fresh) if headers["content-encoding"] == "gzip"
+      kept = gzip ? Zlib.gunzip(entry.body) : entry.body
+      warn "CACHE MISMATCH page #{request.path_info} (#{kept.bytesize} kept vs #{fresh.bytesize} fresh bytes)" unless fresh.b == kept.b
     end
 
     # ---- Authentication

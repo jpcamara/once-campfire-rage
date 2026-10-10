@@ -12,6 +12,10 @@ class MessagesController < ApplicationController
     room_id = id_param("room_id")
     require_authentication!
     room = room_scoped!(room_id)
+    cached_page { index_page(room) }
+  end
+
+  private def index_page(room)
     messages =
       if (before = params["before"]).to_s != ""
         anchor = repo.room_message(room.id, before.to_i) or record_not_found!

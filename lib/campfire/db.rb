@@ -128,6 +128,12 @@ module Campfire
         @generation
       end
 
+      # The generation as of now: data_version read again, even if this fiber already checked it.
+      def current_generation
+        refresh
+        @generation
+      end
+
       def fetch(sql, binds)
         return yield.each(&:freeze).freeze if Campfire.rust_caching_only?
         refresh unless @checked.equal?(Fiber.current)
@@ -170,6 +176,7 @@ module Campfire
 
     def rows(sql, *binds) = @cache.fetch(sql, binds) { @reader.rows(sql, *binds) }
     def generation = @cache.generation
+    def current_generation = @cache.current_generation
     def row(sql, *binds) = rows(sql, *binds).first
     def value(sql, *binds) = rows(sql, *binds).first&.first
 

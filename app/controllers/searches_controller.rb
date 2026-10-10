@@ -1,10 +1,12 @@
 class SearchesController < ApplicationController
   action :index do
     require_authentication!
-    raw = params["q"]
-    query = raw&.gsub(/[^[:word:]]/, " ")
-    messages = query.to_s.strip.empty? ? [] : repo.search(current_user.id, query)
-    render_search(query.to_s.strip.empty? ? nil : query, raw, messages)
+    cached_page do
+      raw = params["q"]
+      query = raw&.gsub(/[^[:word:]]/, " ")
+      messages = query.to_s.strip.empty? ? [] : repo.search(current_user.id, query)
+      render_search(query.to_s.strip.empty? ? nil : query, raw, messages)
+    end
   end
 
   action :create do

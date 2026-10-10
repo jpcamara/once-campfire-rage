@@ -19,8 +19,7 @@ class RoomsController < ApplicationController
     return redirect_with_alert("/", "Room not found or inaccessible") unless room
 
     remember_last_room_visited(room)
-    messages = find_room_messages(room, message_id)
-    render_room(room, messages)
+    cached_page { render_room(room, find_room_messages(room, message_id)) }
   end
 
   action :destroy do
