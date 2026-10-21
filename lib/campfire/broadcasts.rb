@@ -1,29 +1,21 @@
-require "json"
-
 module Campfire
   # Action Cable broadcasting through Rage::Cable. Iodine's pub/sub carries each broadcast to every
-  # worker process, so no Redis is involved. A payload is the message's JSON, as Action Cable
-  # encodes it.
+  # worker process, so no Redis is involved.
   module Broadcasts
     module_function
 
-    # A Turbo Stream broadcast: Action Cable JSON-encodes the HTML string.
     def turbo_stream(stream, html)
-      raw(stream, JSON.generate(html))
+      Rage.cable.broadcast(stream, html)
     end
 
     def json(stream, object)
-      raw(stream, JSON.generate(object))
-    end
-
-    def raw(stream, payload)
-      Rage.cable.broadcast(stream, payload)
+      Rage.cable.broadcast(stream, object)
     end
 
     # ActionCable.server.remote_connections.where(current_user: user).disconnect(reconnect:): every
     # worker closes that user's connections.
     def disconnect_user(user_id, reconnect: false)
-      CableProtocol.disconnect_user(user_id, reconnect: reconnect)
+      ApplicationCable::Connection.disconnect(current_user_id: user_id, protocol_options: { reconnect: reconnect })
     end
   end
 end

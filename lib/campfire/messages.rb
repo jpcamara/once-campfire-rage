@@ -161,8 +161,7 @@ module Campfire
       Broadcasts.turbo_stream(stream, %(<turbo-stream action="append" target="messages_#{room.param_key}_#{room.id}"><template>#{html}</template></turbo-stream>))
 
       member_ids = ctx.db.rows("SELECT memberships.user_id FROM memberships WHERE memberships.room_id = ?", room.id).map(&:first)
-      payload = %({"roomId":#{room.id}})
-      member_ids.each { Broadcasts.raw("user_#{it}_unreads", payload) }
+      member_ids.each { Broadcasts.json("user_#{it}_unreads", { roomId: room.id }) }
 
       Jobs.later(Push, :deliver_for_message, nil, room.id, message.id)
       Webhooks.deliver_later(ctx.runtime, room, message) if webhooks

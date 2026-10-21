@@ -7,7 +7,6 @@ require "rage/all"
 require_relative "../lib/campfire"
 
 Rage.configure do
-  config.cable.protocol = Campfire::CableProtocol
   # Jobs run in this process, in memory, as the Rust port's do.
   config.deferred.backend = nil
 
