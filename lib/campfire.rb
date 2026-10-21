@@ -19,7 +19,6 @@ end
 
 require_relative "campfire/rails_compat"
 require_relative "campfire/ssl"
-require_relative "campfire/cable_gate"
 require_relative "campfire/request_id"
 require_relative "campfire/time_format"
 require_relative "campfire/db"
