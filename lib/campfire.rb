@@ -49,7 +49,6 @@ require_relative "campfire/static_files"
 require_relative "campfire/request_method"
 require_relative "campfire/real_date"
 require_relative "campfire/response_cache"
-require_relative "campfire/form_params"
 
 module Campfire
   def self.boot
