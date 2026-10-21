@@ -24,11 +24,10 @@ module Campfire
       filename = File.basename(upload[:filename].to_s)
       key = Storage.generate_key
       path = Storage.path_for(key)
-      content_type, checksum = Campfire.file_io do
-        FileUtils.mkdir_p(File.dirname(path))
-        FileUtils.cp(tempfile.path, path)
-        [ identify(path, filename, upload[:type]), Digest::MD5.file(path).base64digest ]
-      end
+      FileUtils.mkdir_p(File.dirname(path))
+      FileUtils.cp(tempfile.path, path)
+      content_type = identify(path, filename, upload[:type])
+      checksum = Digest::MD5.file(path).base64digest
       now = TimeFormat.now_text
 
       ctx.db.transaction do |w|
@@ -90,7 +89,7 @@ module Campfire
       content_type = { "jpg" => "image/jpeg", "jpeg" => "image/jpeg", "png" => "image/png", "webp" => "image/webp", "gif" => "image/gif" }[format] || blob.content_type
       metadata = JSON.generate({ "identified" => true, "width" => width, "height" => height, "analyzed" => true })
       now = TimeFormat.now_text
-      checksum = Campfire.file_io { Digest::MD5.file(path).base64digest }
+      checksum = Digest::MD5.file(path).base64digest
 
       ctx.db.transaction do |w|
         w.run("INSERT INTO active_storage_variant_records (blob_id, variation_digest) VALUES (?, ?)", blob.id, digest)

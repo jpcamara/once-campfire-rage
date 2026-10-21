@@ -266,10 +266,9 @@ Server HTML matches the reference on 128 of 128 pages (fresh and cached), and al
 outside the app. The audit covered stored XSS through uploads, the `/cable` Origin check, the bot
 API forgery check, fragment-marker injection, HTTPS mode, and others.
 
-**Iodine:** two Iodine/Rage behaviors needed workarounds, described in the notes:
+**Iodine:** one Iodine behavior still needs a workaround, described in the notes:
 
 - `rack.input` strings arrive with a stale encoding flag.
-- File reads stall on an idle server.
 
 An upstream issue draft is in `notes/iodine-rack-input-coderange-issue.md` on the benchmarks branch.
 
