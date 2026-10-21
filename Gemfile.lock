@@ -55,13 +55,13 @@ GEM
     rack (3.2.7)
     rack-test (2.2.0)
       rack (>= 1.3)
-    rage-iodine (5.7.0)
-    rage-rb (1.28.0)
+    rage-iodine (6.3.0)
+    rage-rb (1.29.0)
       irb
       logger
       rack (< 4)
       rack-test (~> 2.1)
-      rage-iodine (~> 5.6)
+      rage-iodine (~> 6.0)
       rake (>= 12.0)
       thor (~> 1.0)
       zeitwerk (~> 2.6)
@@ -124,7 +124,7 @@ DEPENDENCIES
   erubi (~> 1.13)
   json
   nokogiri (= 1.19.4)
-  rage-rb (~> 1.28)
+  rage-rb (~> 1.29)
   rails-html-sanitizer (= 1.7.1)
   redis-client (~> 0.26)
   rqrcode (= 3.2.0)
@@ -172,8 +172,8 @@ CHECKSUMS
   racc (1.8.1) sha256=4a7f6929691dbec8b5209a0b373bc2614882b55fc5d2e447a21aaa691303d62f
   rack (3.2.7) sha256=93e13e1c24f93556671d85d2d79fa228c3485815c50d7e2f265b5330c6528fb7
   rack-test (2.2.0) sha256=005a36692c306ac0b4a9350355ee080fd09ddef1148a5f8b2ac636c720f5c463
-  rage-iodine (5.7.0) sha256=f8018726e861cefb2910600f429b7a4f2d3010f18288222b2c06abaabe47ec5f
-  rage-rb (1.28.0) sha256=f3e7b5c5c1dac47b7808f89fd781205f704b03b05f3e06d65f2e0a16df34088d
+  rage-iodine (6.3.0) sha256=24043a8ae3150f7d232ef9e40749c97d5bb65e96a78c5a512b786b3cb19405da
+  rage-rb (1.29.0) sha256=d61fd52f8d47423191729e12f8bbcac7090a9f5c958c2ee1e7ae77c757f08d3e
   rails-html-sanitizer (1.7.1) sha256=e797a7c9b01e567307e317c576b49ab4168017e63eea4dba9ce3cb587e2f22c2
   rake (13.4.2) sha256=cb825b2bd5f1f8e91ca37bddb4b9aaf345551b4731da62949be002fa89283701
   rbs (4.2.0) sha256=51f7b886dcc05bc09e10b901daa6a81829f6adc03101d6ca9ea4aac6103e0674
