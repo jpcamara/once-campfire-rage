@@ -57,10 +57,7 @@ module Campfire
         raw = input.read.to_s
         input.rewind
         return unless raw.include?("_method")
-        # Parse the bytes already read, not rack.input: Iodine's #read(length, buffer) copies into the
-        # buffer without clearing Ruby's cached coderange, so Rack's multipart parser takes a binary
-        # part (an avatar or logo upload) for ASCII and raises "invalid byte sequence in UTF-8".
-        Rack::Request.new(env.merge("rack.input" => StringIO.new(raw))).POST["_method"]
+        Rack::Request.new(env).POST["_method"].tap { input.rewind }
       rescue EOFError, Rack::Multipart::Error
         nil
       end

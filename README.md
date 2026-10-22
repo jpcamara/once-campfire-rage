@@ -266,12 +266,6 @@ Server HTML matches the reference on 128 of 128 pages (fresh and cached), and al
 outside the app. The audit covered stored XSS through uploads, the `/cable` Origin check, the bot
 API forgery check, fragment-marker injection, HTTPS mode, and others.
 
-**Iodine:** one Iodine behavior still needs a workaround, described in the notes:
-
-- `rack.input` strings arrive with a stale encoding flag.
-
-An upstream issue draft is in `notes/iodine-rack-input-coderange-issue.md` on the benchmarks branch.
-
 ## Running it
 
 It needs the reference image `campfire-reference:app`, built with `parity/bin/reference build` in
