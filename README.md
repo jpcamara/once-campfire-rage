@@ -27,7 +27,8 @@ Sinatra repo.
 - **Database:** Sequel over SQLite, with every query a named prepared statement.
 - **Views:** shared with the Sinatra app (ERB views ported to Erubi), so the two apps compare as
   frameworks and data layers.
-- **Action Cable:** a custom protocol on Rage::Cable, delivered by Iodine's pub/sub in C.
+- **Action Cable:** Rage 1.29's built-in `actioncable-v1-json` protocol and origin validation,
+  delivered by Iodine's pub/sub in C.
 
 ## Performance
 
@@ -36,6 +37,9 @@ Final run, Oct 8 2026, after the precedent audit: DHH's `bench/run` on a Hetzner
 are on. The numbers are medians of 3 runs in rotating order (HTTP and Action Cable), measured
 alongside the other implementations, stock Rails and the Rust port, with 0 errors. Upload and
 cold-start times are from the Oct 7 run; the audit's reverts don't touch those paths.
+
+The Action Cable figures below predate the move from the local protocol to Rage 1.29's built-in
+protocol and have not been remeasured.
 
 | Workload | Rails (stock) | Rage |
 |---|---:|---:|
@@ -230,7 +234,7 @@ were reverted, as listed in
 
 ## Differences from Rails
 
-Only the ones the Rust port documents in its README under "Known differences":
+The application-level differences shared with the Rust port are:
 
 - `Sec-Fetch-Site` replaces CSRF tokens, and `file_uploader.js` is overridden to match.
 - Jobs run in-process.
@@ -261,13 +265,6 @@ Server HTML matches the reference on 128 of 128 pages (fresh and cached), and al
 **Security:** every finding from the independent audit is fixed, and 30 of 30 checks pass from
 outside the app. The audit covered stored XSS through uploads, the `/cable` Origin check, the bot
 API forgery check, fragment-marker injection, HTTPS mode, and others.
-
-**Iodine:** two Iodine/Rage behaviors needed workarounds, described in the notes:
-
-- `rack.input` strings arrive with a stale encoding flag.
-- File reads stall on an idle server.
-
-An upstream issue draft is in `notes/iodine-rack-input-coderange-issue.md` on the benchmarks branch.
 
 ## Running it
 

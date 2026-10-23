@@ -2,6 +2,8 @@ module ApplicationCable
   class Channel < Rage::Cable::Channel
     include Campfire
 
+    after_unsubscribe :stop_all_streams
+
     def stream_from(stream)
       (@streams ||= []) << stream
       super

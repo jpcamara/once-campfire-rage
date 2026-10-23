@@ -35,7 +35,7 @@ module Campfire
       # only files that exist are kept.
       def entry_for(file)
         return nil unless file.start_with?("#{@root}/")
-        @entries[file] || (entry = Campfire.file_io { load(file) }) && (@entries[file] = entry)
+        @entries[file] || (entry = load(file)) && (@entries[file] = entry)
       end
 
       # Rack::Files' single byte ranges: 206 with the slice, uncompressed, and the Vary that Thruster

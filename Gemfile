@@ -2,7 +2,7 @@ source "https://rubygems.org"
 
 ruby ">= 3.4"
 
-gem "rage-rb", "~> 1.28"
+gem "rage-rb", "~> 1.29"
 gem "sequel", "~> 5.100"
 gem "sqlite3", "~> 2.9"
 gem "erubi", "~> 1.13"

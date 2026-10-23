@@ -19,7 +19,6 @@ end
 
 require_relative "campfire/rails_compat"
 require_relative "campfire/ssl"
-require_relative "campfire/cable_gate"
 require_relative "campfire/request_id"
 require_relative "campfire/time_format"
 require_relative "campfire/db"
@@ -42,7 +41,6 @@ require_relative "campfire/runtime"
 require_relative "campfire/page_cache"
 require_relative "campfire/web"
 require_relative "campfire/pages"
-require_relative "campfire/cable_protocol"
 require_relative "campfire/fragment_body"
 require_relative "campfire/compression"
 require_relative "campfire/etag"
@@ -51,19 +49,12 @@ require_relative "campfire/static_files"
 require_relative "campfire/request_method"
 require_relative "campfire/real_date"
 require_relative "campfire/response_cache"
-require_relative "campfire/form_params"
 
 module Campfire
   def self.boot
     Assets.load(ROOT)
     View.compile(ROOT)
   end
-
-  # Local file IO outside the fiber scheduler. Rage hands reads to Iodine, which waits for a readiness
-  # event between 64 KB chunks of a regular file; on an idle server that event only comes with the
-  # next unrelated request, so a larger file stalls the request reading it. Plain blocking reads of
-  # local files are what the other servers do.
-  def self.file_io(&) = Fiber.blocking(&)
 
   # Process-wide state: the database, secrets and caches. Opened lazily, after Iodine forks.
   def self.runtime

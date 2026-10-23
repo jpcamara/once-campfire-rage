@@ -7,7 +7,9 @@ require "rage/all"
 require_relative "../lib/campfire"
 
 Rage.configure do
-  config.cable.protocol = Campfire::CableProtocol
+  # With no fixed origins, Rage's same-origin-as-host check is the only Cable origin allowance.
+  config.cable.allowed_request_origins = nil
+
   # Jobs run in this process, in memory, as the Rust port's do.
   config.deferred.backend = nil
 
